@@ -1,0 +1,79 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Resident Evil PS1 Tank Controls</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.js"></script>
+<script>
+    // Escena
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x111111);
+
+    // Cámara fija
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 10, -15);
+    camera.lookAt(0, 0, 0);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Luz
+    const light = new THREE.PointLight(0xffffff, 25,100);
+    light.position.set(0, 5, 0);
+    scene.add(light);
+
+    // Piso
+    const floor = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 0.1, 20),
+      new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
+    scene.add(floor);
+
+    // Jugador (cubito)
+    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
+    const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+    const player = new THREE.Mesh(playerGeometry, playerMaterial);
+    player.position.y = 0.5;
+    scene.add(player);
+
+    // Controles
+    const keys = {};
+    document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+    document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+    // Lógica de movimiento tipo tanque
+    const speed = 0.1;
+    const rotationSpeed = 0.05;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (keys['arrowleft']) {
+        player.rotation.y += rotationSpeed;
+      }
+      if (keys['arrowright']) {
+        player.rotation.y -= rotationSpeed;
+      }
+      if (keys['arrowup']) {
+        player.position.x -= Math.sin(player.rotation.y) * speed;
+        player.position.z -= Math.cos(player.rotation.y) * speed;
+      }
+      if (keys['arrowdown']) {
+        player.position.x += Math.sin(player.rotation.y) * speed;
+        player.position.z += Math.cos(player.rotation.y) * speed;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
