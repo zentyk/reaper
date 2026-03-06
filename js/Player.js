@@ -29,6 +29,11 @@ export class Player {
         
         // Inventory Logic
         this.isInventoryOpen = false;
+        this.inventory = [
+            { id: 'handgun', name: 'Handgun', type: 'weapon', equipped: true, combinable: false, usable: false },
+            { id: 'ammo', name: 'Ammo', type: 'ammo', count: 30, combinable: true, usable: false },
+            null, null, null, null // Empty slots
+        ];
 
         // Container for the player (pivot point at feet)
         this.container = new THREE.Group();
@@ -54,6 +59,7 @@ export class Player {
         
         this.updateHealthUI();
         this.updateAmmoUI();
+        this.setupInventoryUI();
     }
 
     update(input, shootableObjects = []) {
@@ -148,24 +154,138 @@ export class Player {
     toggleInventory() {
         this.isInventoryOpen = !this.isInventoryOpen;
         const invScreen = document.getElementById('inventoryScreen');
+        const contextMenu = document.getElementById('contextMenu');
         
         if (this.isInventoryOpen) {
             if (invScreen) {
                 invScreen.style.display = 'flex';
-                this.updateInventoryUI();
+                this.renderInventory();
             }
         } else {
             if (invScreen) {
                 invScreen.style.display = 'none';
+                if (contextMenu) contextMenu.style.display = 'none'; // Hide context menu on close
             }
         }
     }
 
-    updateInventoryUI() {
-        const invAmmo = document.getElementById('invAmmo');
-        if (invAmmo) {
-            invAmmo.innerHTML = `Ammo<br>x${this.totalAmmo}`;
+    setupInventoryUI() {
+        // Close context menu on click outside
+        document.addEventListener('click', (e) => {
+            const contextMenu = document.getElementById('contextMenu');
+            if (contextMenu && contextMenu.style.display === 'flex' && !e.target.closest('.inv-slot')) {
+                contextMenu.style.display = 'none';
+            }
+        });
+    }
+
+    renderInventory() {
+        const grid = document.getElementById('invGrid');
+        if (!grid) return;
+        
+        grid.innerHTML = ''; // Clear current
+
+        this.inventory.forEach((item, index) => {
+            const slot = document.createElement('div');
+            slot.className = 'inv-slot';
+            if (item) {
+                slot.classList.add('item');
+                if (item.equipped) slot.classList.add('equipped');
+                
+                let text = item.name;
+                
+                // Show ammo count for weapon if equipped
+                if (item.type === 'weapon' && item.equipped) {
+                    text += `<br>${this.currentAmmoInClip}/${this.maxAmmoInClip}`;
+                }
+
+                if (item.count !== undefined) text += `<br>x${item.count}`;
+                if (item.equipped) text += `<br>(Equipped)`;
+                
+                slot.innerHTML = text;
+                
+                // Click handler for context menu
+                slot.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showContextMenu(e, item, index);
+                });
+            }
+            grid.appendChild(slot);
+        });
+    }
+
+    showContextMenu(event, item, index) {
+        const contextMenu = document.getElementById('contextMenu');
+        if (!contextMenu) return;
+
+        contextMenu.innerHTML = ''; // Clear options
+        contextMenu.style.display = 'flex';
+        contextMenu.style.left = `${event.clientX}px`;
+        contextMenu.style.top = `${event.clientY}px`;
+
+        // Define Actions
+        const actions = [
+            { 
+                label: item.equipped ? 'Unequip' : 'Equip/Use', 
+                action: () => this.useItem(index),
+                enabled: item.usable || item.type === 'weapon' // Weapons can be equipped, ammo not usable directly here
+            },
+            { 
+                label: 'Combine', 
+                action: () => this.combineItem(index),
+                enabled: item.combinable 
+            },
+            { 
+                label: 'Examine', 
+                action: () => this.examineItem(index),
+                enabled: true 
+            }
+        ];
+
+        actions.forEach(opt => {
+            const div = document.createElement('div');
+            div.className = 'context-option';
+            div.innerText = opt.label;
+            
+            if (opt.enabled) {
+                div.addEventListener('click', () => {
+                    opt.action();
+                    contextMenu.style.display = 'none';
+                });
+            } else {
+                div.classList.add('disabled');
+            }
+            
+            contextMenu.appendChild(div);
+        });
+    }
+
+    useItem(index) {
+        const item = this.inventory[index];
+        if (!item) return;
+
+        console.log(`Using ${item.name}`);
+        
+        if (item.type === 'weapon') {
+            // Toggle equip
+            // For now only one weapon, so just re-render
+            // In future: unequip others, equip this
+            console.log("Weapon equipped/unequipped logic here");
+        } else if (item.type === 'health') {
+            // Heal logic
+            // this.health += 50;
+            // remove item
         }
+    }
+
+    combineItem(index) {
+        console.log(`Combine clicked for ${this.inventory[index].name}`);
+        // Logic for combining: select first, then wait for second click
+    }
+
+    examineItem(index) {
+        console.log(`Examining ${this.inventory[index].name}`);
+        alert(`It's a ${this.inventory[index].name}.`);
     }
 
     reload() {
@@ -186,10 +306,16 @@ export class Player {
             this.currentAmmoInClip += toLoad;
             this.totalAmmo -= toLoad;
             
+            // Update inventory ammo count
+            const ammoItem = this.inventory.find(i => i && i.id === 'ammo');
+            if (ammoItem) {
+                ammoItem.count = this.totalAmmo;
+            }
+            
             this.isReloading = false;
             this.gun.material.color.setHex(originalColor);
             this.updateAmmoUI();
-            this.updateInventoryUI(); // Update inventory if open
+            if (this.isInventoryOpen) this.renderInventory(); // Refresh if open
             console.log("Reloaded!");
         }, 1500); // 1.5s reload time
     }
