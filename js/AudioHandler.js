@@ -5,14 +5,12 @@ export class AudioHandler {
             1: 'bgm/talking.mp3',
             2: 'bgm/disapeareance.mp3'
         };
+        this.fadeInterval = null;
     }
 
     playMusic(level) {
         // Stop current music if playing
-        if (this.bgm) {
-            this.bgm.pause();
-            this.bgm.currentTime = 0;
-        }
+        this.stopMusic();
 
         const track = this.tracks[level];
         if (track) {
@@ -30,37 +28,34 @@ export class AudioHandler {
     }
 
     stopMusic() {
+        if (this.fadeInterval) {
+            clearInterval(this.fadeInterval);
+            this.fadeInterval = null;
+        }
         if (this.bgm) {
             this.bgm.pause();
             this.bgm.currentTime = 0;
         }
     }
 
-    fadeOut(duration = 500) {
-        if (!this.bgm) return;
+    fadeOutMusic(duration = 1000) {
+        if (!this.bgm || this.bgm.paused) return;
 
         const startVolume = this.bgm.volume;
-        const startTime = Date.now();
+        const steps = 50;
+        const stepTime = duration / steps;
+        const stepSize = startVolume / steps;
 
-        const fade = () => {
-            // Check if bgm still exists (might have been stopped/replaced)
-            if (!this.bgm) return;
+        if (this.fadeInterval) {
+            clearInterval(this.fadeInterval);
+        }
 
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            // Linear fade
-            this.bgm.volume = Math.max(0, startVolume * (1 - progress));
-
-            if (progress < 1) {
-                requestAnimationFrame(fade);
+        this.fadeInterval = setInterval(() => {
+            if (this.bgm.volume > stepSize) {
+                this.bgm.volume -= stepSize;
             } else {
                 this.stopMusic();
-                // Reset volume for next play isn't strictly necessary as playMusic creates new Audio,
-                // but good practice if we were reusing the object.
             }
-        };
-
-        fade();
+        }, stepTime);
     }
 }

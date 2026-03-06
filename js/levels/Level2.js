@@ -99,7 +99,8 @@ export function setupLevel2(game) {
         isDoor: true, 
         name: "Exit Door",
         isObstacle: true, 
-        boundingBox: new THREE.Box3().setFromObject(door)
+        boundingBox: new THREE.Box3().setFromObject(door),
+        targetLevel: 1 // Leads back to Level 1
     };
     
     game.scene.add(door);

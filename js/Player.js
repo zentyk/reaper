@@ -255,7 +255,7 @@ export class Player {
                         this.openPickupPrompt(item);
                         return;
                     } else if (item.userData.isDoor) {
-                        this.tryOpenDoor();
+                        this.tryOpenDoor(item);
                         return;
                     }
                 }
@@ -263,27 +263,29 @@ export class Player {
         }
     }
     
-    tryOpenDoor() {
+    tryOpenDoor(door) {
         // Check if player has the key
         const hasKey = this.inventory.some(item => item && item.id === 'key');
         
         if (hasKey) {
-            this.finishGame();
+            this.initiateLevelChange(door.userData.targetLevel);
         } else {
             this.showFeedback("It's locked. You need a key.");
         }
     }
     
-    finishGame() {
+    initiateLevelChange(targetLevel) {
         // Fade out and load next level
+        this.game.audio.fadeOutMusic();
+        
         const fadeOverlay = document.getElementById('fadeOverlay');
         if (fadeOverlay) {
             fadeOverlay.style.opacity = '1';
             setTimeout(() => {
-                this.game.loadNextLevel();
+                this.game.changeLevel(targetLevel);
             }, 500); // Wait for fade
         } else {
-            this.game.loadNextLevel();
+            this.game.changeLevel(targetLevel);
         }
     }
     

@@ -17,7 +17,6 @@ export function setupLevel1(game) {
     game.activeCamera = game.cameras.north;
 
     // Lights
-    // Clear existing lights first (simple approach: remove all PointLights)
     game.scene.children.filter(obj => obj.isPointLight).forEach(l => game.scene.remove(l));
 
     const light = new THREE.PointLight(0xffffff, 100, 100);
@@ -111,7 +110,8 @@ export function setupLevel1(game) {
         isDoor: true, 
         name: "Exit Door",
         isObstacle: true, 
-        boundingBox: new THREE.Box3().setFromObject(door)
+        boundingBox: new THREE.Box3().setFromObject(door),
+        targetLevel: 2 // Leads to Level 2
     };
     
     game.scene.add(door);

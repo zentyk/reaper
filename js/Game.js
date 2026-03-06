@@ -1,7 +1,6 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
 import { Player } from './Player.js';
 import { InputHandler } from './InputHandler.js';
-import { Zombie } from './Zombie.js';
 import { Pathfinder } from './Pathfinder.js';
 import { setupLevel1 } from './levels/Level1.js';
 import { setupLevel2 } from './levels/Level2.js';
@@ -53,7 +52,7 @@ export class Game {
 
         this.animate = this.animate.bind(this);
         
-        // Initial Fade In - Use setTimeout to ensure DOM is ready and transition triggers
+        // Initial Fade In
         setTimeout(() => this.fadeIn(), 100);
     }
 
@@ -76,7 +75,7 @@ export class Game {
     fadeIn() {
         const fadeOverlay = document.getElementById('fadeOverlay');
         if (fadeOverlay) {
-            // Ensure it starts black (should be set in CSS/HTML initially too)
+            // Ensure it starts black
             fadeOverlay.style.opacity = '1';
             
             // Use a small timeout to allow the browser to render the opacity: 1 state
@@ -87,8 +86,8 @@ export class Game {
         }
     }
     
-    loadNextLevel() {
-        this.currentLevel++;
+    changeLevel(levelNumber) {
+        this.currentLevel = levelNumber;
         
         // Update UI
         const levelText = document.getElementById('levelText');
@@ -223,6 +222,8 @@ export class Game {
     gameOver() {
         if (this.isGameOver) return;
         this.isGameOver = true;
+        
+        this.audio.fadeOutMusic();
         
         const screen = document.getElementById('gameOverScreen');
         screen.style.display = 'flex';
