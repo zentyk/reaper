@@ -3,77 +3,191 @@
   <meta charset="UTF-8">
   <title>Resident Evil PS1 Tank Controls</title>
   <style>
-    body { margin: 0; overflow: hidden; }
+    body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; }
     canvas { display: block; }
+
+    /* Game Over Screen */
+    #gameOverScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: black;
+        display: none;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 10;
+        opacity: 0;
+        transition: opacity 1s ease-in;
+    }
+    #gameOverText {
+        color: #880000;
+        font-size: 5rem;
+        font-weight: bold;
+        text-shadow: 0 0 10px red;
+    }
+
+    /* Start Screen */
+    #startScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #111;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        z-index: 20;
+    }
+    #startScreen h1 {
+        color: white;
+        font-size: 4rem;
+        margin-bottom: 50px;
+        text-shadow: 0 0 10px #00ff00;
+    }
+    #startButton {
+        padding: 20px 40px;
+        font-size: 2rem;
+        background-color: #333;
+        color: white;
+        border: 2px solid #555;
+        cursor: pointer;
+        font-family: 'Courier New', Courier, monospace;
+        transition: background-color 0.3s;
+    }
+    #startButton:hover {
+        background-color: #555;
+    }
+
+    /* UI Container */
+    #uiContainer {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        display: none; /* Hidden initially */
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+    }
+    #healthContainer, #ammoContainer {
+        color: white;
+        font-size: 1.5rem;
+        background-color: rgba(0,0,0,0.5);
+        padding: 10px;
+        border-radius: 5px;
+        display: flex;
+        align-items: center;
+    }
+    #healthBar {
+        width: 200px;
+        height: 20px;
+        background-color: #333;
+        border: 1px solid #555;
+        margin-left: 10px;
+    }
+    #healthValue {
+        width: 100%;
+        height: 100%;
+        background-color: green;
+        transition: width 0.5s ease, background-color 0.5s ease;
+    }
+    #ammoValue {
+        margin-left: 10px;
+        font-weight: bold;
+    }
+
+    /* Inventory Styles */
+    #inventoryScreen {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        display: none;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 5;
+        color: white;
+    }
+    #inventoryScreen h2 {
+        font-size: 3rem;
+        margin-bottom: 20px;
+        border-bottom: 2px solid white;
+        padding-bottom: 10px;
+    }
+    .inv-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 100px);
+        grid-template-rows: repeat(2, 100px);
+        gap: 10px;
+    }
+    .inv-slot {
+        width: 100px;
+        height: 100px;
+        border: 2px solid #555;
+        background-color: #222;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+        font-size: 0.8rem;
+        cursor: pointer;
+    }
+    .inv-slot.equipped {
+        border-color: #00ff00;
+        box-shadow: 0 0 10px #00ff00;
+    }
+    .inv-slot.item {
+        background-color: #333;
+    }
+    .instructions {
+        margin-top: 20px;
+        font-size: 1.2rem;
+        color: #aaa;
+    }
   </style>
 </head>
 <body>
-  <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.js"></script>
-<script>
-    // Escena
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111111);
+  <div id="startScreen">
+      <h1>REAPER</h1>
+      <button id="startButton">START GAME</button>
+  </div>
 
-    // Cámara fija
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 10, -15);
-    camera.lookAt(0, 0, 0);
+  <div id="gameOverScreen">
+      <div id="gameOverText">YOU DIED</div>
+  </div>
 
-    // Renderer
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+  <div id="inventoryScreen">
+      <h2>INVENTORY</h2>
+      <div class="inv-grid">
+          <div class="inv-slot item equipped">Handgun<br>(Equipped)</div>
+          <div class="inv-slot item" id="invAmmo">Ammo<br>x30</div>
+          <div class="inv-slot"></div>
+          <div class="inv-slot"></div>
+          <div class="inv-slot"></div>
+          <div class="inv-slot"></div>
+      </div>
+      <div class="instructions">Press 'I' to Close</div>
+  </div>
 
-    // Luz
-    const light = new THREE.PointLight(0xffffff, 25,100);
-    light.position.set(0, 5, 0);
-    scene.add(light);
-
-    // Piso
-    const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(20, 0.1, 20),
-      new THREE.MeshStandardMaterial({ color: 0x333333 })
-    );
-    scene.add(floor);
-
-    // Jugador (cubito)
-    const playerGeometry = new THREE.BoxGeometry(1, 1, 1);
-    const playerMaterial = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
-    const player = new THREE.Mesh(playerGeometry, playerMaterial);
-    player.position.y = 0.5;
-    scene.add(player);
-
-    // Controles
-    const keys = {};
-    document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-    document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
-
-    // Lógica de movimiento tipo tanque
-    const speed = 0.1;
-    const rotationSpeed = 0.05;
-
-    function animate() {
-      requestAnimationFrame(animate);
-
-      if (keys['arrowleft']) {
-        player.rotation.y += rotationSpeed;
-      }
-      if (keys['arrowright']) {
-        player.rotation.y -= rotationSpeed;
-      }
-      if (keys['arrowup']) {
-        player.position.x -= Math.sin(player.rotation.y) * speed;
-        player.position.z -= Math.cos(player.rotation.y) * speed;
-      }
-      if (keys['arrowdown']) {
-        player.position.x += Math.sin(player.rotation.y) * speed;
-        player.position.z += Math.cos(player.rotation.y) * speed;
-      }
-
-      renderer.render(scene, camera);
-    }
-
-    animate();
-  </script>
+  <div id="uiContainer">
+      <div id="healthContainer">
+          <span>HEALTH</span>
+          <div id="healthBar">
+              <div id="healthValue"></div>
+          </div>
+      </div>
+      <div id="ammoContainer">
+          <span>AMMO</span>
+          <div id="ammoValue">15 / 30</div>
+      </div>
+  </div>
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
