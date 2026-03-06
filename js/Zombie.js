@@ -9,6 +9,8 @@ export class Zombie {
         this.isBiting = false;
         this.isKnockedDown = false;
         this.knockDownTimer = 0;
+        this.path = []; // Current path
+        this.pathUpdateTimer = 0;
 
         // Match player height (1.8) and width (0.5)
         const geometry = new THREE.BoxGeometry(0.5, 1.8, 0.5);
@@ -27,7 +29,7 @@ export class Zombie {
         this.scene.add(this.mesh);
     }
 
-    update(playerPos, isPlayerGrappled) {
+    update(playerPos, isPlayerGrappled, obstacles = [], pathfinder = null) {
         if (this.isDead) return;
 
         // Handle Knockdown State
@@ -56,20 +58,78 @@ export class Zombie {
             return;
         }
 
-        // Normal Chase Logic
+        // Pathfinding Logic
+        if (pathfinder) {
+            this.pathUpdateTimer++;
+            // Recalculate path every 30 frames (0.5s) or if no path
+            if (this.pathUpdateTimer > 30 || this.path.length === 0) {
+                this.pathUpdateTimer = 0;
+                const newPath = pathfinder.findPath(this.mesh.position, playerPos);
+                if (newPath && newPath.length > 0) {
+                    this.path = newPath;
+                }
+            }
+        }
+
+        let targetPos = playerPos;
+        
+        // If we have a path, target the next node
+        if (this.path.length > 0) {
+            // The first point is usually current position or very close, so target the second
+            // Or if we are close to the first point, remove it
+            const nextPoint = this.path[0];
+            const dist = new THREE.Vector3(this.mesh.position.x, 0, this.mesh.position.z)
+                .distanceTo(new THREE.Vector3(nextPoint.x, 0, nextPoint.z));
+            
+            if (dist < 0.5) {
+                this.path.shift(); // Reached this node
+                if (this.path.length > 0) {
+                    targetPos = this.path[0];
+                }
+            } else {
+                targetPos = nextPoint;
+            }
+        }
+
+        // Movement Logic
         const direction = new THREE.Vector3()
-            .subVectors(playerPos, this.mesh.position);
+            .subVectors(targetPos, this.mesh.position);
         
         // Ignore Y difference to prevent flying/sinking
         direction.y = 0;
         direction.normalize();
         
-        // Move towards player
-        this.mesh.position.add(direction.multiplyScalar(this.speed));
+        // Calculate potential new position
+        const moveVector = direction.multiplyScalar(this.speed);
+        const newPos = this.mesh.position.clone().add(moveVector);
         
-        // Face player (but keep upright)
-        const lookTarget = new THREE.Vector3(playerPos.x, this.mesh.position.y, playerPos.z);
+        // Check collision with obstacles (still needed for dynamic/small adjustments)
+        if (!this.checkObstacleCollision(newPos, obstacles)) {
+            this.mesh.position.add(moveVector);
+        }
+        
+        // Face movement direction
+        const lookTarget = new THREE.Vector3(targetPos.x, this.mesh.position.y, targetPos.z);
         this.mesh.lookAt(lookTarget);
+    }
+    
+    checkObstacleCollision(position, obstacles) {
+        const radius = 0.3; // Zombie radius
+        
+        for (const obstacle of obstacles) {
+            if (obstacle.userData.boundingBox) {
+                // Create a box for the zombie at the new position
+                const zombieBox = new THREE.Box3();
+                const min = new THREE.Vector3(position.x - radius, 0, position.z - radius);
+                const max = new THREE.Vector3(position.x + radius, 2, position.z + radius);
+                zombieBox.set(min, max);
+                
+                if (zombieBox.intersectsBox(obstacle.userData.boundingBox)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     checkCollision(playerPos) {

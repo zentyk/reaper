@@ -21,10 +21,13 @@ export class Player {
         this.lastRState = false; // Track previous state of R key
         this.lastIState = false; // Track previous state of I key
 
+        // Cheats
+        this.infiniteHealth = false;
+
         // Ammo Logic
         this.maxAmmoInClip = 15;
         this.currentAmmoInClip = 15;
-        this.totalAmmo = 30; // Starting ammo in inventory
+        this.totalAmmo = 10; // Starting ammo in inventory
         this.isReloading = false;
         
         // Inventory Logic
@@ -36,6 +39,10 @@ export class Player {
             { id: 'ammo', name: 'Ammo', type: 'ammo', count: 30, combinable: true, usable: false },
             null, null, null, null // Empty slots
         ];
+        
+        // Pickup Logic
+        this.pendingCollectible = null;
+        this.isPickupPromptOpen = false;
         
         // Track equipped weapon
         this.equippedWeapon = this.inventory[0];
@@ -66,6 +73,44 @@ export class Player {
         this.updateHealthUI();
         this.updateAmmoUI();
         this.setupInventoryUI();
+        this.setupCheatUI();
+        this.setupPickupUI();
+    }
+
+    setupCheatUI() {
+        const cheatBtn = document.getElementById('cheatBtn');
+        if (cheatBtn) {
+            cheatBtn.addEventListener('click', () => {
+                this.infiniteHealth = !this.infiniteHealth;
+                cheatBtn.innerText = `Infinite Health: ${this.infiniteHealth ? 'ON' : 'OFF'}`;
+                if (this.infiniteHealth) {
+                    cheatBtn.classList.add('active');
+                    this.health = 100; // Restore health
+                    this.updateHealthUI();
+                    this.updateSpeed();
+                } else {
+                    cheatBtn.classList.remove('active');
+                }
+            });
+        }
+    }
+    
+    setupPickupUI() {
+        const yesBtn = document.getElementById('pickupYes');
+        const noBtn = document.getElementById('pickupNo');
+        
+        if (yesBtn) {
+            yesBtn.addEventListener('click', () => {
+                this.collectItem();
+                this.closePickupPrompt();
+            });
+        }
+        
+        if (noBtn) {
+            noBtn.addEventListener('click', () => {
+                this.closePickupPrompt();
+            });
+        }
     }
 
     updateWeaponState() {
@@ -76,7 +121,7 @@ export class Player {
         }
     }
 
-    update(input, shootableObjects = []) {
+    update(input, shootableObjects = [], obstacles = [], interactables = []) {
         const isSpaceDown = input.isKeyDown(' ');
         const isRDown = input.isKeyDown('r');
         const isIDown = input.isKeyDown('i');
@@ -88,8 +133,8 @@ export class Player {
         }
         this.lastIState = isIDown;
 
-        if (this.isInventoryOpen) {
-            return; // Pause game logic while inventory is open
+        if (this.isInventoryOpen || this.isPickupPromptOpen) {
+            return; // Pause game logic while inventory or prompt is open
         }
 
         if (this.isGrappled) {
@@ -101,6 +146,11 @@ export class Player {
             this.lastSpaceState = isSpaceDown;
             this.lastRState = isRDown;
             return; // Disable movement and shooting while grappled
+        }
+        
+        // Interaction Logic (Space)
+        if (isSpaceDown && !this.lastSpaceState) {
+            this.checkInteraction(interactables);
         }
 
         // Reload Logic (R key)
@@ -153,18 +203,203 @@ export class Player {
             if (input.isKeyDown('arrowright')) {
                 this.container.rotation.y -= this.rotationSpeed;
             }
+            
+            // Calculate potential new position
+            let dx = 0;
+            let dz = 0;
+            
             if (input.isKeyDown('arrowup')) {
-                this.container.position.x -= Math.sin(this.container.rotation.y) * this.speed;
-                this.container.position.z -= Math.cos(this.container.rotation.y) * this.speed;
+                dx -= Math.sin(this.container.rotation.y) * this.speed;
+                dz -= Math.cos(this.container.rotation.y) * this.speed;
             }
             if (input.isKeyDown('arrowdown')) {
-                this.container.position.x += Math.sin(this.container.rotation.y) * this.speed;
-                this.container.position.z += Math.cos(this.container.rotation.y) * this.speed;
+                dx += Math.sin(this.container.rotation.y) * this.speed;
+                dz += Math.cos(this.container.rotation.y) * this.speed;
+            }
+            
+            // Check collision independently for X and Z to allow sliding
+            if (dx !== 0 || dz !== 0) {
+                // Try moving X
+                const newPosX = this.container.position.clone();
+                newPosX.x += dx;
+                if (!this.checkCollision(newPosX, obstacles)) {
+                    this.container.position.x += dx;
+                }
+
+                // Try moving Z
+                const newPosZ = this.container.position.clone();
+                newPosZ.z += dz;
+                if (!this.checkCollision(newPosZ, obstacles)) {
+                    this.container.position.z += dz;
+                }
             }
         }
         
         this.lastSpaceState = isSpaceDown;
         this.lastRState = isRDown;
+    }
+    
+    checkInteraction(interactables) {
+        const interactionRadius = 2.5; // Increased radius to account for height differences
+        
+        for (const item of interactables) {
+            if (item.visible) {
+                // Calculate 2D distance (XZ plane)
+                const dx = this.container.position.x - item.position.x;
+                const dz = this.container.position.z - item.position.z;
+                const distance = Math.sqrt(dx*dx + dz*dz);
+                
+                if (distance < interactionRadius) {
+                    if (item.userData.isCollectible) {
+                        this.openPickupPrompt(item);
+                        return;
+                    } else if (item.userData.isDoor) {
+                        this.tryOpenDoor();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+    
+    tryOpenDoor() {
+        // Check if player has the key
+        const hasKey = this.inventory.some(item => item && item.id === 'key');
+        
+        if (hasKey) {
+            this.finishGame();
+        } else {
+            this.showFeedback("It's locked. You need a key.");
+        }
+    }
+    
+    finishGame() {
+        // Fade out and reload
+        const fadeOverlay = document.getElementById('fadeOverlay');
+        if (fadeOverlay) {
+            fadeOverlay.style.opacity = '1';
+            setTimeout(() => {
+                window.location.reload();
+            }, 500); // Wait for fade
+        } else {
+            window.location.reload();
+        }
+    }
+    
+    openPickupPrompt(item) {
+        this.pendingCollectible = item;
+        this.isPickupPromptOpen = true;
+        
+        const prompt = document.getElementById('pickupPrompt');
+        const text = document.getElementById('pickupText');
+        
+        if (prompt && text) {
+            text.innerText = `Will you take the ${item.userData.name}?`;
+            prompt.style.display = 'flex';
+        }
+    }
+    
+    closePickupPrompt() {
+        this.isPickupPromptOpen = false;
+        this.pendingCollectible = null;
+        
+        const prompt = document.getElementById('pickupPrompt');
+        if (prompt) {
+            prompt.style.display = 'none';
+        }
+    }
+    
+    collectItem() {
+        if (!this.pendingCollectible) return;
+        
+        const itemData = this.pendingCollectible.userData;
+        
+        if (itemData.type === 'ammo') {
+            // Add to inventory
+            // Check if ammo already exists
+            const existingAmmo = this.inventory.find(i => i && i.id === 'ammo');
+            if (existingAmmo) {
+                existingAmmo.count += itemData.amount;
+                this.totalAmmo = existingAmmo.count;
+            } else {
+                // Find empty slot
+                const emptyIndex = this.inventory.findIndex(i => i === null);
+                if (emptyIndex !== -1) {
+                    this.inventory[emptyIndex] = { 
+                        id: 'ammo', 
+                        name: 'Ammo', 
+                        type: 'ammo', 
+                        count: itemData.amount, 
+                        combinable: true, 
+                        usable: false 
+                    };
+                    this.totalAmmo += itemData.amount;
+                } else {
+                    this.showFeedback("Inventory Full");
+                    return;
+                }
+            }
+            
+            this.updateAmmoUI();
+            this.showFeedback(`Picked up ${itemData.amount} Ammo`);
+            
+            // Remove from scene (hide it)
+            this.pendingCollectible.visible = false;
+        } else if (itemData.type === 'key') {
+            // Add key to inventory
+            const emptyIndex = this.inventory.findIndex(i => i === null);
+            if (emptyIndex !== -1) {
+                this.inventory[emptyIndex] = { 
+                    id: 'key', 
+                    name: 'Exit Key', 
+                    type: 'key', 
+                    combinable: false, 
+                    usable: false 
+                };
+                this.showFeedback(`Picked up ${itemData.name}`);
+                this.pendingCollectible.visible = false;
+            } else {
+                this.showFeedback("Inventory Full");
+            }
+        } else if (itemData.type === 'health') {
+            // Add herb to inventory
+            const emptyIndex = this.inventory.findIndex(i => i === null);
+            if (emptyIndex !== -1) {
+                this.inventory[emptyIndex] = { 
+                    id: 'herb', 
+                    name: 'Green Herb', 
+                    type: 'health', 
+                    amount: itemData.amount,
+                    combinable: false, 
+                    usable: true 
+                };
+                this.showFeedback(`Picked up ${itemData.name}`);
+                this.pendingCollectible.visible = false;
+            } else {
+                this.showFeedback("Inventory Full");
+            }
+        }
+    }
+    
+    checkCollision(position, obstacles) {
+        // Simple bounding box check
+        // Player radius approx 0.25, use slightly larger for safety
+        const playerRadius = 0.3;
+        
+        // Create a box for the player at the new position
+        const playerBox = new THREE.Box3();
+        const min = new THREE.Vector3(position.x - playerRadius, 0, position.z - playerRadius);
+        const max = new THREE.Vector3(position.x + playerRadius, 2, position.z + playerRadius);
+        playerBox.set(min, max);
+        
+        for (const obstacle of obstacles) {
+            if (obstacle.userData.boundingBox) {
+                if (playerBox.intersectsBox(obstacle.userData.boundingBox)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     toggleInventory() {
@@ -190,14 +425,12 @@ export class Player {
         // Close context menu on click outside
         document.addEventListener('click', (e) => {
             const contextMenu = document.getElementById('contextMenu');
-            
-            // Hide context menu if clicking outside
-            if (contextMenu && contextMenu.style.display === 'flex' && !e.target.closest('.inv-slot') && !e.target.closest('#contextMenu')) {
+            if (contextMenu && contextMenu.style.display === 'flex' && !e.target.closest('.inv-slot')) {
                 contextMenu.style.display = 'none';
             }
             
-            // Cancel combine if clicking outside slots AND outside context menu
-            if (this.combineSourceIndex !== null && !e.target.closest('.inv-slot') && !e.target.closest('#contextMenu')) {
+            // Cancel combine if clicking outside slots
+            if (this.combineSourceIndex !== null && !e.target.closest('.inv-slot')) {
                 this.combineSourceIndex = null;
                 this.renderInventory();
             }
@@ -334,8 +567,16 @@ export class Player {
             this.renderInventory(); // Refresh UI
         } else if (item.type === 'health') {
             // Heal logic
-            // this.health += 50;
-            // remove item
+            this.health += item.amount;
+            if (this.health > 100) this.health = 100;
+            
+            this.updateHealthUI();
+            this.updateSpeed();
+            this.showFeedback("Health Restored");
+            
+            // Remove item
+            this.inventory[index] = null;
+            this.renderInventory();
         }
     }
 
@@ -398,9 +639,9 @@ export class Player {
         // Create a temporary feedback element
         const feedback = document.createElement('div');
         feedback.style.position = 'absolute';
-        feedback.style.top = '50%';
+        feedback.style.bottom = '100px'; // Changed from top: 50% to bottom: 100px
         feedback.style.left = '50%';
-        feedback.style.transform = 'translate(-50%, -50%)';
+        feedback.style.transform = 'translateX(-50%)'; // Changed from translate(-50%, -50%)
         feedback.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
         feedback.style.color = 'white';
         feedback.style.padding = '20px';
@@ -535,6 +776,8 @@ export class Player {
     }
 
     takeDamage(amount) {
+        if (this.infiniteHealth) return false; // Cheat check
+
         this.health -= amount;
         if (this.health < 0) this.health = 0;
         
