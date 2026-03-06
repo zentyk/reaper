@@ -29,11 +29,16 @@ export class Player {
         
         // Inventory Logic
         this.isInventoryOpen = false;
+        this.combineSourceIndex = null; // Track item selected for combination
+        
         this.inventory = [
-            { id: 'handgun', name: 'Handgun', type: 'weapon', equipped: true, combinable: false, usable: false },
+            { id: 'handgun', name: 'Handgun', type: 'weapon', equipped: true, combinable: true, usable: false },
             { id: 'ammo', name: 'Ammo', type: 'ammo', count: 30, combinable: true, usable: false },
             null, null, null, null // Empty slots
         ];
+        
+        // Track equipped weapon
+        this.equippedWeapon = this.inventory[0];
 
         // Container for the player (pivot point at feet)
         this.container = new THREE.Group();
@@ -57,9 +62,18 @@ export class Player {
 
         this.raycaster = new THREE.Raycaster();
         
+        this.updateWeaponState();
         this.updateHealthUI();
         this.updateAmmoUI();
         this.setupInventoryUI();
+    }
+
+    updateWeaponState() {
+        if (this.equippedWeapon) {
+            this.gun.visible = true;
+        } else {
+            this.gun.visible = false;
+        }
     }
 
     update(input, shootableObjects = []) {
@@ -90,12 +104,14 @@ export class Player {
         }
 
         // Reload Logic (R key)
-        if (isRDown && !this.lastRState && !this.isReloading && this.currentAmmoInClip < this.maxAmmoInClip && this.totalAmmo > 0) {
+        // Only reload if weapon equipped
+        if (isRDown && !this.lastRState && !this.isReloading && this.equippedWeapon && this.currentAmmoInClip < this.maxAmmoInClip && this.totalAmmo > 0) {
             this.reload();
         }
 
         // Check for Aiming (Shift)
-        this.isAiming = input.isKeyDown('shift');
+        // Only aim if weapon equipped
+        this.isAiming = input.isKeyDown('shift') && this.equippedWeapon;
 
         if (this.isAiming) {
             // Aiming Logic
@@ -159,6 +175,7 @@ export class Player {
         if (this.isInventoryOpen) {
             if (invScreen) {
                 invScreen.style.display = 'flex';
+                this.combineSourceIndex = null; // Reset combine state on open
                 this.renderInventory();
             }
         } else {
@@ -173,8 +190,16 @@ export class Player {
         // Close context menu on click outside
         document.addEventListener('click', (e) => {
             const contextMenu = document.getElementById('contextMenu');
-            if (contextMenu && contextMenu.style.display === 'flex' && !e.target.closest('.inv-slot')) {
+            
+            // Hide context menu if clicking outside
+            if (contextMenu && contextMenu.style.display === 'flex' && !e.target.closest('.inv-slot') && !e.target.closest('#contextMenu')) {
                 contextMenu.style.display = 'none';
+            }
+            
+            // Cancel combine if clicking outside slots AND outside context menu
+            if (this.combineSourceIndex !== null && !e.target.closest('.inv-slot') && !e.target.closest('#contextMenu')) {
+                this.combineSourceIndex = null;
+                this.renderInventory();
             }
         });
     }
@@ -185,9 +210,26 @@ export class Player {
         
         grid.innerHTML = ''; // Clear current
 
+        // Add instruction text if combining
+        if (this.combineSourceIndex !== null) {
+            const instruction = document.createElement('div');
+            instruction.style.position = 'absolute';
+            instruction.style.top = '80px';
+            instruction.style.color = '#ff00ff'; // Purple text to match
+            instruction.innerText = "Select item to combine with...";
+            grid.appendChild(instruction);
+        }
+
         this.inventory.forEach((item, index) => {
             const slot = document.createElement('div');
             slot.className = 'inv-slot';
+            
+            // Highlight if selected for combine
+            if (this.combineSourceIndex === index) {
+                slot.style.borderColor = '#ff00ff'; // Purple
+                slot.style.boxShadow = '0 0 10px #ff00ff';
+            }
+
             if (item) {
                 slot.classList.add('item');
                 if (item.equipped) slot.classList.add('equipped');
@@ -198,16 +240,32 @@ export class Player {
                 if (item.type === 'weapon' && item.equipped) {
                     text += `<br>${this.currentAmmoInClip}/${this.maxAmmoInClip}`;
                 }
-
+                
                 if (item.count !== undefined) text += `<br>x${item.count}`;
                 if (item.equipped) text += `<br>(Equipped)`;
                 
                 slot.innerHTML = text;
                 
-                // Click handler for context menu
+                // Click handler
                 slot.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.showContextMenu(e, item, index);
+                    
+                    if (this.combineSourceIndex !== null) {
+                        // If in combine mode, try to combine with this target
+                        this.finishCombination(index);
+                    } else {
+                        // Otherwise show context menu
+                        this.showContextMenu(e, item, index);
+                    }
+                });
+            } else {
+                // Empty slot click
+                slot.addEventListener('click', (e) => {
+                     if (this.combineSourceIndex !== null) {
+                         // Cancel combine if clicking empty slot
+                         this.combineSourceIndex = null;
+                         this.renderInventory();
+                     }
                 });
             }
             grid.appendChild(slot);
@@ -248,7 +306,8 @@ export class Player {
             div.innerText = opt.label;
             
             if (opt.enabled) {
-                div.addEventListener('click', () => {
+                div.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Stop propagation to prevent immediate cancel by document listener
                     opt.action();
                     contextMenu.style.display = 'none';
                 });
@@ -267,10 +326,12 @@ export class Player {
         console.log(`Using ${item.name}`);
         
         if (item.type === 'weapon') {
-            // Toggle equip
-            // For now only one weapon, so just re-render
-            // In future: unequip others, equip this
-            console.log("Weapon equipped/unequipped logic here");
+            if (item.equipped) {
+                this.unequipWeapon(item);
+            } else {
+                this.equipWeapon(item);
+            }
+            this.renderInventory(); // Refresh UI
         } else if (item.type === 'health') {
             // Heal logic
             // this.health += 50;
@@ -278,14 +339,119 @@ export class Player {
         }
     }
 
+    equipWeapon(item) {
+        // Unequip current if any
+        if (this.equippedWeapon) {
+            this.equippedWeapon.equipped = false;
+        }
+        
+        item.equipped = true;
+        this.equippedWeapon = item;
+        this.updateWeaponState();
+        console.log(`Equipped ${item.name}`);
+    }
+
+    unequipWeapon(item) {
+        item.equipped = false;
+        this.equippedWeapon = null;
+        this.updateWeaponState();
+        console.log(`Unequipped ${item.name}`);
+    }
+
     combineItem(index) {
-        console.log(`Combine clicked for ${this.inventory[index].name}`);
-        // Logic for combining: select first, then wait for second click
+        console.log(`Combine selected for ${this.inventory[index].name}`);
+        this.combineSourceIndex = index;
+        this.renderInventory(); // Re-render to show highlight
+    }
+
+    finishCombination(targetIndex) {
+        if (this.combineSourceIndex === targetIndex) {
+            // Clicked same item, cancel
+            this.combineSourceIndex = null;
+            this.renderInventory();
+            return;
+        }
+
+        const source = this.inventory[this.combineSourceIndex];
+        const target = this.inventory[targetIndex];
+        
+        console.log(`Combining ${source.name} with ${target.name}`);
+
+        // Logic for Handgun + Ammo
+        if ((source.id === 'handgun' && target.id === 'ammo') || 
+            (source.id === 'ammo' && target.id === 'handgun')) {
+            
+            // Find which one is the ammo item
+            const ammoItem = source.id === 'ammo' ? source : target;
+            this.instantReload(ammoItem);
+        } else {
+            console.log("Cannot combine these items.");
+            // Show feedback on UI instead of alert
+            this.showFeedback("This action cannot be done");
+        }
+        
+        this.combineSourceIndex = null;
+        this.renderInventory();
+    }
+
+    showFeedback(message) {
+        // Create a temporary feedback element
+        const feedback = document.createElement('div');
+        feedback.style.position = 'absolute';
+        feedback.style.top = '50%';
+        feedback.style.left = '50%';
+        feedback.style.transform = 'translate(-50%, -50%)';
+        feedback.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+        feedback.style.color = 'white';
+        feedback.style.padding = '20px';
+        feedback.style.borderRadius = '5px';
+        feedback.style.zIndex = '1000';
+        feedback.innerText = message;
+        
+        document.body.appendChild(feedback);
+        
+        setTimeout(() => {
+            if (document.body.contains(feedback)) {
+                document.body.removeChild(feedback);
+            }
+        }, 2000);
+    }
+
+    instantReload(ammoItem) {
+        if (this.currentAmmoInClip >= this.maxAmmoInClip) {
+            console.log("Clip already full.");
+            this.showFeedback("Clip is already full.");
+            return;
+        }
+
+        const needed = this.maxAmmoInClip - this.currentAmmoInClip;
+        const toLoad = Math.min(needed, ammoItem.count);
+        
+        if (toLoad <= 0) {
+            console.log("No ammo.");
+            this.showFeedback("No ammo remaining.");
+            return;
+        }
+
+        this.currentAmmoInClip += toLoad;
+        ammoItem.count -= toLoad;
+        this.totalAmmo = ammoItem.count; // Sync total ammo tracking
+
+        // If ammo depleted, remove item? Or keep empty? 
+        // Usually keep empty or remove. Let's keep it for now or remove if 0.
+        if (ammoItem.count === 0) {
+            // Find index and remove? Or just leave as 0.
+            // Leaving as 0 is fine for now.
+        }
+
+        this.updateAmmoUI();
+        console.log("Reloaded via combination!");
+        this.showFeedback("Reloaded!");
     }
 
     examineItem(index) {
         console.log(`Examining ${this.inventory[index].name}`);
-        alert(`It's a ${this.inventory[index].name}.`);
+        this.showFeedback(`It's a ${this.inventory[index].name}.`);
     }
 
     reload() {

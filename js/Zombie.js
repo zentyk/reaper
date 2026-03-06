@@ -7,7 +7,8 @@ export class Zombie {
         this.health = 3;
         this.isDead = false;
         this.isBiting = false;
-        this.biteTimer = 0;
+        this.isKnockedDown = false;
+        this.knockDownTimer = 0;
 
         // Match player height (1.8) and width (0.5)
         const geometry = new THREE.BoxGeometry(0.5, 1.8, 0.5);
@@ -28,6 +29,15 @@ export class Zombie {
 
     update(playerPos, isPlayerGrappled) {
         if (this.isDead) return;
+
+        // Handle Knockdown State
+        if (this.isKnockedDown) {
+            this.knockDownTimer--;
+            if (this.knockDownTimer <= 0) {
+                this.standUp();
+            }
+            return; // Don't move or bite while knocked down
+        }
 
         // If this zombie is biting, stay attached
         if (this.isBiting) {
@@ -63,7 +73,7 @@ export class Zombie {
     }
 
     checkCollision(playerPos) {
-        if (this.isDead) return false;
+        if (this.isDead || this.isKnockedDown) return false;
 
         // Check distance in 2D (XZ plane)
         const dx = this.mesh.position.x - playerPos.x;
@@ -82,9 +92,28 @@ export class Zombie {
         this.mesh.material.color.setHex(0x0000ff); // Back to blue
         this.mesh.rotation.z = 0; // Reset shake
         
-        // Push back
+        // Push back and knock down
         const pushDir = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion);
         this.mesh.position.add(pushDir.multiplyScalar(-1.5)); // Push back 1.5 units
+        
+        this.knockDown();
+    }
+
+    knockDown() {
+        this.isKnockedDown = true;
+        this.knockDownTimer = 300; // 5 seconds at 60fps
+        
+        // Animation: Fall over
+        this.mesh.rotation.x = -Math.PI / 2;
+        this.mesh.position.y = 0.25; // Lower to ground
+    }
+
+    standUp() {
+        this.isKnockedDown = false;
+        
+        // Animation: Stand up
+        this.mesh.rotation.x = 0;
+        this.mesh.position.y = 0.9; // Back to standing height
     }
 
     takeDamage() {
