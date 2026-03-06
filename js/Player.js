@@ -1,8 +1,9 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
 
 export class Player {
-    constructor(scene) {
+    constructor(scene, game) {
         this.scene = scene;
+        this.game = game; // Reference to game instance
         
         // Movement Settings
         this.walkSpeed = 0.08;
@@ -274,15 +275,15 @@ export class Player {
     }
     
     finishGame() {
-        // Fade out and reload
+        // Fade out and load next level
         const fadeOverlay = document.getElementById('fadeOverlay');
         if (fadeOverlay) {
             fadeOverlay.style.opacity = '1';
             setTimeout(() => {
-                window.location.reload();
+                this.game.loadNextLevel();
             }, 500); // Wait for fade
         } else {
-            window.location.reload();
+            this.game.loadNextLevel();
         }
     }
     

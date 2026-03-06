@@ -1,8 +1,9 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
 import { Player } from './Player.js';
 import { InputHandler } from './InputHandler.js';
-import { Zombie } from './Zombie.js';
 import { Pathfinder } from './Pathfinder.js';
+import { setupLevel1 } from './levels/Level1.js';
+import { setupLevel2 } from './levels/Level2.js';
 
 export class Game {
     constructor() {
@@ -40,13 +41,17 @@ export class Game {
         this.keySpawned = false;
         this.keyMesh = null;
         this.isCutscene = false;
+        
+        this.currentLevel = 1;
 
         this.setupLights();
-        this.setupEnvironment();
-
-        this.input = new InputHandler();
-        this.player = new Player(this.scene);
+        this.createFloor();
         
+        this.input = new InputHandler();
+        this.player = new Player(this.scene, this); // Pass game instance to player
+        
+        this.setupEnvironment(); // Setup level after player is created
+
         // Initialize Pathfinder
         this.pathfinder = new Pathfinder(20, 20, this.obstacles);
 
@@ -67,110 +72,58 @@ export class Game {
         this.scene.add(lightC);
     }
 
-    setupEnvironment() {
+    createFloor() {
         const floor = new THREE.Mesh(
             new THREE.BoxGeometry(20, 0.1, 20),
             new THREE.MeshStandardMaterial({ color: 0x333333 })
         );
         this.scene.add(floor);
+    }
 
-        // Add Obstacles
-        this.obstacles = [];
-        const obstaclePositions = [
-            { x: 5, z: 5, w: 2, h: 2 },
-            { x: -5, z: -5, w: 2, h: 2 },
-            { x: 5, z: -5, w: 1, h: 4 },
-            { x: -5, z: 5, w: 4, h: 1 }
-        ];
-
-        obstaclePositions.forEach(pos => {
-            const geometry = new THREE.BoxGeometry(pos.w, 2, pos.h);
-            const material = new THREE.MeshStandardMaterial({ color: 0x555555 });
-            const obstacle = new THREE.Mesh(geometry, material);
-            obstacle.position.set(pos.x, 1, pos.z);
-            obstacle.castShadow = true;
-            obstacle.receiveShadow = true;
-            
-            // Add bounding box for collision
-            obstacle.geometry.computeBoundingBox();
-            obstacle.userData = { isObstacle: true, boundingBox: new THREE.Box3().setFromObject(obstacle) };
-            
-            this.scene.add(obstacle);
-            this.obstacles.push(obstacle);
-        });
-
-        // Add Collectibles (Ammo Box)
-        this.interactables = [];
-        const ammoBoxGeo = new THREE.BoxGeometry(0.5, 0.3, 0.3);
-        const ammoBoxMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); // Green box
-        const ammoBox = new THREE.Mesh(ammoBoxGeo, ammoBoxMat);
-        ammoBox.position.set(2, 0.15, 2);
-        ammoBox.userData = { 
-            isCollectible: true, 
-            type: 'ammo', 
-            amount: 15,
-            name: 'Handgun Ammo'
-        };
-        this.scene.add(ammoBox);
-        this.interactables.push(ammoBox);
-
-        // Add Key (Hidden initially)
-        const keyGeo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
-        const keyMat = new THREE.MeshStandardMaterial({ color: 0xFFFF00 }); // Yellow
-        const key = new THREE.Mesh(keyGeo, keyMat);
-        key.position.set(3, 0.1, 2); 
-        key.userData = { 
-            isCollectible: true, 
-            type: 'key', 
-            name: 'Exit Key'
-        };
-        key.visible = false; // Hide initially
-        this.scene.add(key);
-        this.interactables.push(key);
-        this.keyMesh = key;
-
-        // Add Green Herb
-        const herbGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.3, 8);
-        const herbMat = new THREE.MeshStandardMaterial({ color: 0x00ff00 }); // Green
-        const herb = new THREE.Mesh(herbGeo, herbMat);
-        herb.position.set(-2, 0.15, -2);
-        herb.userData = { 
-            isCollectible: true, 
-            type: 'health', 
-            amount: 50,
-            name: 'Green Herb'
-        };
-        this.scene.add(herb);
-        this.interactables.push(herb);
-
-        // Add Door (Now also an obstacle)
-        const doorGeo = new THREE.BoxGeometry(2, 3, 0.2);
-        const doorMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
-        const door = new THREE.Mesh(doorGeo, doorMat);
-        // Position on North wall (z = -10)
-        door.position.set(0, 1.5, -10); 
-        
-        // Add bounding box for collision
-        door.geometry.computeBoundingBox();
-        door.userData = { 
-            isDoor: true, 
-            name: "Exit Door",
-            isObstacle: true, // Treat as obstacle
-            boundingBox: new THREE.Box3().setFromObject(door)
-        };
-        
-        this.scene.add(door);
-        this.interactables.push(door);
-        this.obstacles.push(door); // Add to obstacles list for collision
-
-        // Add some zombies
-        this.zombies = [];
-        for (let i = 0; i < 5; i++) {
-            const x = (Math.random() - 0.5) * 15;
-            const z = (Math.random() - 0.5) * 15;
-            const zombie = new Zombie(this.scene, x, z);
-            this.zombies.push(zombie);
+    setupEnvironment() {
+        if (this.currentLevel === 1) {
+            setupLevel1(this);
+        } else {
+            setupLevel2(this);
         }
+    }
+    
+    loadNextLevel() {
+        this.currentLevel++;
+        
+        // Update UI
+        const levelText = document.getElementById('levelText');
+        if (levelText) levelText.innerText = `Level ${this.currentLevel}`;
+        
+        // Fade In
+        const fadeOverlay = document.getElementById('fadeOverlay');
+        if (fadeOverlay) {
+            fadeOverlay.style.opacity = '0';
+        }
+        
+        // Reset Game State
+        // Remove old entities
+        this.zombies.forEach(z => this.scene.remove(z.mesh));
+        this.obstacles.forEach(o => this.scene.remove(o));
+        this.interactables.forEach(i => this.scene.remove(i));
+        
+        // Reset arrays
+        this.zombies = [];
+        this.obstacles = [];
+        this.interactables = [];
+        this.keySpawned = false;
+        this.keyMesh = null;
+        
+        // Reset Player Rotation
+        this.player.container.rotation.set(0, 0, 0);
+        
+        // Re-setup environment
+        this.setupEnvironment();
+        
+        // Re-init pathfinder
+        this.pathfinder = new Pathfinder(20, 20, this.obstacles);
+        
+        console.log(`Level ${this.currentLevel} Loaded`);
     }
 
     updateZombies() {
