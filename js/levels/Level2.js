@@ -2,7 +2,37 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.mo
 import { Zombie } from '../Zombie.js';
 
 export function setupLevel2(game) {
-    // Level 2: Central Pillar, More Zombies
+    // --- Level Configuration ---
+    
+    // Audio
+    game.audio.playMusic(2);
+
+    // Cameras (Different angles for Level 2)
+    game.cameras.north.position.set(15, 15, -15); // Higher and further
+    game.cameras.north.lookAt(0, 0, 0);
+    
+    game.cameras.south.position.set(-15, 15, 15);
+    game.cameras.south.lookAt(0, 0, 0);
+    
+    game.activeCamera = game.cameras.north;
+
+    // Lights (Reddish/Darker mood)
+    // Clear existing lights
+    game.scene.children.filter(obj => obj.isPointLight).forEach(l => game.scene.remove(l));
+
+    const light = new THREE.PointLight(0xffaaaa, 80, 100); // Red tint
+    light.position.set(0, 8, 0);
+    game.scene.add(light);
+
+    const lightB = new THREE.PointLight(0xaa4444, 60, 100); // Darker red
+    lightB.position.set(10, 5, 10);
+    game.scene.add(lightB);
+
+    const lightC = new THREE.PointLight(0xaa4444, 60, 100);
+    lightC.position.set(-10, 5, -10);
+    game.scene.add(lightC);
+
+    // --- Environment ---
     
     // Obstacles
     const obstaclePositions = [

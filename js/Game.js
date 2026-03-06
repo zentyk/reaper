@@ -1,29 +1,23 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
 import { Player } from './Player.js';
 import { InputHandler } from './InputHandler.js';
+import { Zombie } from './Zombie.js';
 import { Pathfinder } from './Pathfinder.js';
 import { setupLevel1 } from './levels/Level1.js';
 import { setupLevel2 } from './levels/Level2.js';
+import { AudioHandler } from './AudioHandler.js';
 
 export class Game {
     constructor() {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x111111);
 
-        // Cameras
+        // Cameras (Initialized here, but configured per level)
         this.cameras = {
             north: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
             south: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
             cutscene: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
         };
-        
-        // Setup North Camera (Looking South)
-        this.cameras.north.position.set(10, 10, -15);
-        this.cameras.north.lookAt(-10, 0, 0);
-        
-        // Setup South Camera (Looking North)
-        this.cameras.south.position.set(-10, 10, 15);
-        this.cameras.south.lookAt(0, 0, 0);
         
         this.activeCamera = this.cameras.north;
 
@@ -44,32 +38,23 @@ export class Game {
         
         this.currentLevel = 1;
 
-        this.setupLights();
+        // Audio
+        this.audio = new AudioHandler();
+
         this.createFloor();
         
         this.input = new InputHandler();
         this.player = new Player(this.scene, this); // Pass game instance to player
         
-        this.setupEnvironment(); // Setup level after player is created
-
+        this.setupEnvironment(); // Setup level (lights, cameras, objects)
+        
         // Initialize Pathfinder
         this.pathfinder = new Pathfinder(20, 20, this.obstacles);
 
         this.animate = this.animate.bind(this);
-    }
-
-    setupLights() {
-        const light = new THREE.PointLight(0xffffff, 100, 100);
-        light.position.set(0, 10, 0);
-        this.scene.add(light);
-
-        const lightB = new THREE.PointLight(0xffffff, 100, 100);
-        lightB.position.set(10, 10, 0);
-        this.scene.add(lightB);
-
-        const lightC = new THREE.PointLight(0xffffff, 100, 100);
-        lightC.position.set(-10, 10, 0);
-        this.scene.add(lightC);
+        
+        // Initial Fade In - Use setTimeout to ensure DOM is ready and transition triggers
+        setTimeout(() => this.fadeIn(), 100);
     }
 
     createFloor() {
@@ -88,18 +73,26 @@ export class Game {
         }
     }
     
+    fadeIn() {
+        const fadeOverlay = document.getElementById('fadeOverlay');
+        if (fadeOverlay) {
+            // Ensure it starts black (should be set in CSS/HTML initially too)
+            fadeOverlay.style.opacity = '1';
+            
+            // Use a small timeout to allow the browser to render the opacity: 1 state
+            // before switching to opacity: 0 to trigger the transition
+            requestAnimationFrame(() => {
+                fadeOverlay.style.opacity = '0';
+            });
+        }
+    }
+    
     loadNextLevel() {
         this.currentLevel++;
         
         // Update UI
         const levelText = document.getElementById('levelText');
         if (levelText) levelText.innerText = `Level ${this.currentLevel}`;
-        
-        // Fade In
-        const fadeOverlay = document.getElementById('fadeOverlay');
-        if (fadeOverlay) {
-            fadeOverlay.style.opacity = '0';
-        }
         
         // Reset Game State
         // Remove old entities
@@ -117,13 +110,16 @@ export class Game {
         // Reset Player Rotation
         this.player.container.rotation.set(0, 0, 0);
         
-        // Re-setup environment
+        // Re-setup environment (This will configure lights, cameras, audio, and spawn player)
         this.setupEnvironment();
         
         // Re-init pathfinder
         this.pathfinder = new Pathfinder(20, 20, this.obstacles);
         
         console.log(`Level ${this.currentLevel} Loaded`);
+        
+        // Trigger Fade In
+        this.fadeIn();
     }
 
     updateZombies() {

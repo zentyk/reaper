@@ -2,6 +2,38 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.mo
 import { Zombie } from '../Zombie.js';
 
 export function setupLevel1(game) {
+    // --- Level Configuration ---
+    
+    // Audio
+    game.audio.playMusic(1);
+
+    // Cameras
+    game.cameras.north.position.set(10, 10, -15);
+    game.cameras.north.lookAt(-10, 0, 0);
+    
+    game.cameras.south.position.set(-10, 10, 15);
+    game.cameras.south.lookAt(0, 0, 0);
+    
+    game.activeCamera = game.cameras.north;
+
+    // Lights
+    // Clear existing lights first (simple approach: remove all PointLights)
+    game.scene.children.filter(obj => obj.isPointLight).forEach(l => game.scene.remove(l));
+
+    const light = new THREE.PointLight(0xffffff, 100, 100);
+    light.position.set(0, 10, 0);
+    game.scene.add(light);
+
+    const lightB = new THREE.PointLight(0xffffff, 100, 100);
+    lightB.position.set(10, 10, 0);
+    game.scene.add(lightB);
+
+    const lightC = new THREE.PointLight(0xffffff, 100, 100);
+    lightC.position.set(-10, 10, 0);
+    game.scene.add(lightC);
+
+    // --- Environment ---
+
     // Add Obstacles
     const obstaclePositions = [
         { x: 5, z: 5, w: 2, h: 2 },
