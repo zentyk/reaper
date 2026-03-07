@@ -34,9 +34,19 @@ export class AISystem {
             ai.knockDownTimer -= dt;
             if (ai.knockDownTimer <= 0) {
                 ai.state = 'chase'; // Stand up
+                
+                // Reset Transform
+                transform.position.y = 0.9;
+                transform.rotation.x = 0;
+                
+                // Reset Mesh
                 if (meshComp && meshComp.mesh) {
                     meshComp.mesh.rotation.x = 0;
                     meshComp.mesh.position.y = 0.9;
+                    // Ensure color is reset if it wasn't already
+                    if (meshComp.mesh.material.color.getHex() === 0xff00ff) { // If still purple
+                         meshComp.mesh.material.color.setHex(0x0000ff);
+                    }
                 }
             }
             return;
@@ -95,12 +105,22 @@ export class AISystem {
             dir.y = 0;
             dir.normalize();
             
-            const moveVector = dir.multiplyScalar(movement.speed);
-            const newPos = transform.position.clone().add(moveVector);
+            // Axis-independent movement for sliding
+            const dx = dir.x * movement.speed;
+            const dz = dir.z * movement.speed;
             
-            // Check Collision
-            if (!this.checkCollision(newPos, entity, obstacles)) {
-                transform.position.add(moveVector);
+            // Try moving X
+            let nextPos = transform.position.clone();
+            nextPos.x += dx;
+            if (!this.checkCollision(nextPos, entity, obstacles)) {
+                transform.position.x += dx;
+            }
+
+            // Try moving Z
+            nextPos = transform.position.clone();
+            nextPos.z += dz;
+            if (!this.checkCollision(nextPos, entity, obstacles)) {
+                transform.position.z += dz;
             }
             
             // Look at
