@@ -241,6 +241,7 @@ export class Player {
         this.game.isPaused = true;
         this.isPickupMode = true;
         this.pendingCollectible = item;
+        this.renderInventory();
         this.game.ui.openPickupMode(item.components.CollectibleTag.name);
     }
 

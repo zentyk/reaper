@@ -73,8 +73,17 @@ export class CombatSystem {
 
                 const gTransform = grappler.components.Transform;
                 const pTransform = player.components.Transform;
-                this._tempPushDir.subVectors(gTransform.position, pTransform.position).normalize();
+
+                this._tempPushDir.subVectors(gTransform.position, pTransform.position);
+                this._tempPushDir.y = 0; // Keep push horizontal
+                if (this._tempPushDir.lengthSq() > 0) this._tempPushDir.normalize();
+                else this._tempPushDir.set(0, 0, 1);
+
                 gTransform.position.add(this._tempPushDir.multiplyScalar(1.5));
+
+                if (grappler.rigidBody) {
+                    grappler.rigidBody.setNextKinematicTranslation(gTransform.position);
+                }
 
                 if (grappler.components.MeshComponent) {
                     this.flashEntity(grappler, 0x0000ff); // Reset color
@@ -328,7 +337,11 @@ export class CombatSystem {
 
                 if (ai.state === 'knocked_down' || ai.state === 'dead') continue;
 
-                if (zTransform.position.distanceTo(pTransform.position) < 1.0) {
+                const dx = zTransform.position.x - pTransform.position.x;
+                const dz = zTransform.position.z - pTransform.position.z;
+                const distSq = dx * dx + dz * dz;
+
+                if (distSq < 1.2) {
                     console.log("Grappled!");
                     grapple.isGrappled = true;
                     grapple.grappler = entity;
