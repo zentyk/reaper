@@ -1,13 +1,8 @@
 import { Game } from './Game.js';
 
-const startButton = document.getElementById('startButton');
-const startScreen = document.getElementById('startScreen');
-const uiContainer = document.getElementById('uiContainer');
+// The Game class now handles its own initialization and loop start.
+// The UIManager inside Game will handle the start button click.
 
-startButton.addEventListener('click', () => {
-    startScreen.style.display = 'none';
-    uiContainer.style.display = 'flex';
-    
-    const game = new Game();
-    game.start();
-});
+// We create the game instance immediately.
+// It will initialize the UI and wait for the start button to be clicked (handled in Game.js/UIManager.js).
+const game = new Game();

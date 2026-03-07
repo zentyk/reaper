@@ -1,0 +1,263 @@
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import { Transform, MeshComponent, PlayerTag, ZombieTag, ObstacleTag, CollectibleTag, DoorTag, Health, Movement, AI, Collider, Weapon, Inventory } from './components.js';
+
+export class LevelManager {
+    constructor(game) {
+        this.game = game;
+        this.currentLevel = 1;
+        
+        // Cameras
+        this.cameras = {
+            north: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
+            south: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+        };
+    }
+
+    loadLevel(levelNumber) {
+        this.currentLevel = levelNumber;
+        console.log(`Loading Level ${levelNumber}`);
+
+        this.clearLevel();
+        this.setupCommonEnvironment();
+
+        if (levelNumber === 1) {
+            this.setupLevel1();
+        } else {
+            this.setupLevel2();
+        }
+
+        this.game.ui.updateLevelText(levelNumber);
+        this.game.audio.playMusic(levelNumber);
+        this.game.ui.fadeIn();
+    }
+
+    clearLevel() {
+        // Remove all entities from ECS and Scene
+        for (const entity of this.game.world.entities) {
+            if (entity.components.MeshComponent) {
+                this.game.scene.remove(entity.components.MeshComponent.mesh);
+            }
+        }
+        this.game.world.entities = [];
+        
+        // Clear lights
+        this.game.scene.children.filter(obj => obj.isLight).forEach(l => this.game.scene.remove(l));
+    }
+
+    setupCommonEnvironment() {
+        // Floor
+        const floor = new THREE.Mesh(
+            new THREE.BoxGeometry(20, 0.1, 20),
+            new THREE.MeshStandardMaterial({ color: 0x333333 })
+        );
+        this.game.scene.add(floor);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        this.game.scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        this.game.scene.add(dirLight);
+    }
+
+    createEntity(components, id = null) {
+        const entity = this.game.world.createEntity();
+        if (id) entity.persistentId = id; // Store persistent ID on entity
+        
+        for (const component of components) {
+            this.game.world.addComponent(entity, component);
+            if (component instanceof MeshComponent) {
+                this.game.scene.add(component.mesh);
+                // Also store ID on mesh userData for legacy/raycasting access
+                if (id) component.mesh.userData.id = id;
+            }
+        }
+        return entity;
+    }
+
+    setupLevel1() {
+        // Cameras
+        this.game.cameras.north.position.set(0, 12, -12);
+        this.game.cameras.north.lookAt(0, 0, 0);
+        this.game.activeCamera = this.game.cameras.north;
+
+        // Player
+        this.createPlayer(0, 0, 0);
+
+        // Obstacles
+        this.createObstacle('obs1', 5, 5, 2, 2);
+        this.createObstacle('obs2', -5, -5, 2, 2);
+        this.createObstacle('obs3', 5, -5, 1, 4);
+        this.createObstacle('obs4', -5, 5, 4, 1);
+
+        // Collectibles
+        this.createCollectible('ammo1', 'ammo', 15, 'Handgun Ammo', 2, 0.15, 2);
+        this.createCollectible('key1', 'key', 1, 'Exit Key', 3, 0.1, 2);
+        this.createCollectible('herb1', 'health', 50, 'Green Herb', -2, 0.15, -2);
+
+        // Door
+        this.createDoor('door1', 0, 1.5, -10, 2, 3, 0.2, 2);
+
+        // Zombies
+        this.createZombie('zombie1', -7, -7);
+        this.createZombie('zombie2', 7, -7);
+        this.createZombie('zombie3', 0, 5);
+    }
+
+    setupLevel2() {
+        // Cameras
+        this.game.cameras.north.position.set(0, 15, -15);
+        this.game.cameras.north.lookAt(0, 0, 0);
+        this.game.activeCamera = this.game.cameras.north;
+
+        // Player
+        this.createPlayer(0, 0, -8);
+
+        // Obstacles
+        this.createObstacle('l2_obs1', 0, 0, 4, 4); // Center pillar
+        this.createObstacle('l2_obs2', -8, -8, 2, 2);
+        this.createObstacle('l2_obs3', 8, 8, 2, 2);
+
+        // Collectibles
+        this.createCollectible('l2_ammo1', 'ammo', 15, 'Handgun Ammo', -5, 0.15, -5);
+        this.createCollectible('l2_herb1', 'health', 50, 'Green Herb', 5, 0.15, 5);
+        this.createCollectible('l2_key1', 'key', 1, 'Exit Key', 0, 0.1, 8);
+
+        // Door
+        this.createDoor('l2_door1', 10, 1.5, 0, 0.2, 3, 2, 1);
+
+        // Zombies
+        this.createZombie('l2_zombie1', -7, 0);
+        this.createZombie('l2_zombie2', 7, 0);
+        this.createZombie('l2_zombie3', 0, 7);
+    }
+
+    createPlayer(x, z) {
+        // Container Group
+        const container = new THREE.Group();
+        container.position.set(x, 0, z);
+
+        // Body
+        const bodyGeo = new THREE.BoxGeometry(0.5, 1.8, 0.5);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.position.y = 0.9;
+        body.castShadow = true;
+        container.add(body);
+
+        // Gun
+        const gunGeo = new THREE.BoxGeometry(0.1, 0.1, 0.4);
+        const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const gun = new THREE.Mesh(gunGeo, gunMat);
+        gun.position.set(0.3, 1.4, -0.4);
+        container.add(gun);
+        
+        // Store gun ref on container for easy access if needed (optional)
+        container.userData.gun = gun;
+
+        const entity = this.createEntity([
+            new Transform(x, 0, z), // Transform matches container
+            new MeshComponent(container),
+            new PlayerTag(),
+            new Health(100, 100),
+            new Movement(0.08, 0.04),
+            new Collider(0.3),
+            new Inventory(),
+            new Weapon(15, 15)
+        ]);
+        
+        // Link player to game for legacy access
+        this.game.playerEntity = entity; 
+        
+        // Update Player class reference if it exists
+        if (this.game.player) {
+            this.game.player.container = container;
+            this.game.player.gun = gun;
+            this.game.player.entity = entity; // Link ECS entity to Player controller
+        }
+    }
+
+    createZombie(id, x, z) {
+        if (this.game.gameState.isZombieDead(this.currentLevel, id)) return;
+
+        const geometry = new THREE.BoxGeometry(0.5, 1.8, 0.5);
+        const material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
+        const mesh = new THREE.Mesh(geometry, material);
+
+        this.createEntity([
+            new Transform(x, 0.9, z),
+            new MeshComponent(mesh),
+            new ZombieTag(),
+            new Health(3, 3),
+            new Movement(0.03, 0.0),
+            new AI(),
+            new Collider(0.3)
+        ], id);
+    }
+
+    createObstacle(id, x, z, w, h) {
+        const geometry = new THREE.BoxGeometry(w, 2, h);
+        const material = new THREE.MeshStandardMaterial({ color: 0x555555 });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, 1, z);
+
+        this.createEntity([
+            new Transform(x, 1, z),
+            new MeshComponent(mesh),
+            new ObstacleTag(),
+            new Collider(Math.max(w, h) / 2)
+        ], id);
+    }
+
+    createCollectible(id, type, amount, name, x, y, z) {
+        if (this.game.gameState.isItemCollected(this.currentLevel, id)) return;
+
+        let geometry, material;
+        if (type === 'ammo') {
+            geometry = new THREE.BoxGeometry(0.5, 0.3, 0.3);
+            material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+        } else if (type === 'key') {
+            geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+            material = new THREE.MeshStandardMaterial({ color: 0xFFFF00 });
+        } else {
+            geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.3, 8);
+            material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+        }
+        
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        
+        const entity = this.createEntity([
+            new Transform(x, y, z),
+            new MeshComponent(mesh),
+            new CollectibleTag(type, amount, name)
+        ], id);
+        
+        if (type === 'key') {
+            mesh.visible = false;
+            this.game.keyEntity = entity;
+        }
+        
+        this.game.interactables.push(entity);
+    }
+
+    createDoor(id, x, y, z, w, h, d, targetLevel) {
+        const geometry = new THREE.BoxGeometry(w, h, d);
+        const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        
+        const entity = this.createEntity([
+            new Transform(x, y, z),
+            new MeshComponent(mesh),
+            new DoorTag(targetLevel),
+            new ObstacleTag(),
+            new Collider(Math.max(w, d) / 2)
+        ], id);
+        
+        this.game.interactables.push(entity);
+        this.game.obstacles.push(entity);
+    }
+}
