@@ -136,6 +136,12 @@ export class CombatSystem {
                 weapon.cooldown = weapon.fireRate;
 
                 this.updateAmmoUI(weapon);
+
+                // Trigger Tofu knife stab animation
+                if (window.game && window.game.player && !window.game.player.knifeStabbing) {
+                    window.game.player.knifeStabbing = true;
+                    window.game.player.knifeStabTimer = 0;
+                }
             } else {
                 console.log("Click! Empty.");
             }
@@ -276,14 +282,133 @@ export class CombatSystem {
 
         if (entity.components.PlayerTag) {
             this.game.ui.updateHealth(Math.max(0, health.current), health.max);
+
+            // Trigger Tofu hit-stagger body animation
+            if (window.game && window.game.player) {
+                window.game.player.triggerHitStagger();
+            }
+
             if (health.current <= 0) {
                 if (this.game.gameOver) this.game.gameOver();
             }
         } else {
+            // Hit effects for enemies
+            const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
+            this.spawnBloodParticles(entity);
+            this.applyZombieRecoil(entity, playerEntity);
+
             if (health.current <= 0) {
                 this.killEntity(entity);
             }
         }
+    }
+
+    spawnBloodParticles(entity) {
+        const meshComp = entity.components.MeshComponent;
+        if (!meshComp || !meshComp.mesh) return;
+
+        const origin = meshComp.mesh.position.clone();
+        origin.y += 0.9; // Target center torso
+
+        const particleCount = 10;
+        const particles = [];
+        const scene = this.game.scene;
+
+        for (let i = 0; i < particleCount; i++) {
+            const geo = new THREE.SphereGeometry(0.035, 4, 4);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xcc0000, transparent: true });
+            const p = new THREE.Mesh(geo, mat);
+            p.position.copy(origin);
+
+            // Random burst velocity
+            const vel = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.14,
+                Math.random() * 0.18 + 0.05,
+                (Math.random() - 0.5) * 0.14
+            );
+
+            scene.add(p);
+            particles.push({ mesh: p, vel, life: 1.0 });
+        }
+
+        const gravity = -0.008;
+        const tick = () => {
+            let alive = false;
+            for (const particle of particles) {
+                if (particle.life <= 0) continue;
+                alive = true;
+                particle.vel.y += gravity;
+                particle.mesh.position.addScaledVector(particle.vel, 1);
+                particle.life -= 0.06;
+                particle.mesh.material.opacity = Math.max(0, particle.life);
+            }
+
+            if (alive) {
+                requestAnimationFrame(tick);
+            } else {
+                for (const particle of particles) {
+                    scene.remove(particle.mesh);
+                    particle.mesh.geometry.dispose();
+                    particle.mesh.material.dispose();
+                }
+            }
+        };
+        requestAnimationFrame(tick);
+    }
+
+    applyZombieRecoil(entity, playerEntity) {
+        const ai = entity.components.AI;
+        const transform = entity.components.Transform;
+        const rigidBody = entity.rigidBody;
+
+        if (!ai || !transform || !rigidBody || ai.state === 'dead') return;
+
+        // Push direction: away from the player
+        const pushDir = new THREE.Vector3(0, 0, 1);
+        if (playerEntity && playerEntity.components.Transform) {
+            pushDir.subVectors(transform.position, playerEntity.components.Transform.position);
+            pushDir.y = 0;
+            pushDir.normalize();
+        }
+
+        // Pause AI movement during recoil
+        ai.previousState = ai.state;
+        ai.state = 'recoiling';
+        ai.recoilTimer = 0.3;
+
+        const kickDist = 1.4;   // Much more visible
+        const duration = 0.3;
+        let elapsed = 0;
+        const startX = transform.position.x;
+        const startZ = transform.position.z;
+
+        const recoilTick = () => {
+            elapsed += 0.016;
+            const t = Math.min(elapsed / duration, 1.0);
+            const arc = Math.sin(t * Math.PI); // Peak at center, return to 0
+
+            const newX = startX + pushDir.x * arc * kickDist;
+            const newZ = startZ + pushDir.z * arc * kickDist;
+
+            // Drive via rigid body so it syncs with the physics world
+            rigidBody.setNextKinematicTranslation({
+                x: newX,
+                y: rigidBody.translation().y,
+                z: newZ
+            });
+
+            if (t < 1.0) {
+                requestAnimationFrame(recoilTick);
+            } else {
+                // Snap back to start
+                rigidBody.setNextKinematicTranslation({
+                    x: startX,
+                    y: rigidBody.translation().y,
+                    z: startZ
+                });
+            }
+        };
+        requestAnimationFrame(recoilTick);
     }
 
     flashEntity(entity, colorHex) {

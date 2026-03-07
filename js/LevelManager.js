@@ -235,12 +235,30 @@ export class LevelManager {
         body.castShadow = true;
         container.add(body);
 
-        // Gun
-        const gunGeo = new THREE.BoxGeometry(0.1, 0.1, 0.4);
-        const gunMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        const gun = new THREE.Mesh(gunGeo, gunMat);
-        gun.position.set(0.3, 1.4, -0.4);
-        container.add(gun);
+        // Tofu's Knife Weapon
+        const knifeGroup = new THREE.Group();
+
+        // Blade - thin pointy white slab
+        const bladeGeo = new THREE.BoxGeometry(0.05, 0.04, 0.45);
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.6, roughness: 0.3 });
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.z = -0.2; // Blade extends out in front
+        knifeGroup.add(blade);
+
+        // Handle - slightly wider, beige/tan
+        const handleGeo = new THREE.BoxGeometry(0.07, 0.07, 0.18);
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0xc2a068 });
+        const handle = new THREE.Mesh(handleGeo, handleMat);
+        handle.position.z = 0.1; // Behind blade
+        knifeGroup.add(handle);
+
+        // Position: raised and outstretched on right side — aiming like a gun
+        knifeGroup.position.set(0.28, 1.2, -0.5);
+        knifeGroup.rotation.set(0, 0, 0); // Flat, pointing straight forward
+        container.add(knifeGroup);
+
+        // Alias as 'gun' for compatibility with existing equip/unequip logic
+        const gun = knifeGroup;
 
         // Store gun ref on container for easy access if needed (optional)
         container.userData.gun = gun;

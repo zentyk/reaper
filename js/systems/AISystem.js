@@ -75,6 +75,15 @@ export class AISystem {
             return;
         }
 
+        // Handle Recoil (skip AI movement, decrement timer)
+        if (ai.state === 'recoiling') {
+            ai.recoilTimer -= dt;
+            if (ai.recoilTimer <= 0) {
+                ai.state = ai.previousState || 'chase';
+            }
+            return;
+        }
+
         // If biting, stay put
         if (ai.state === 'biting') {
             return;

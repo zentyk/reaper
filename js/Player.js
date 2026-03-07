@@ -18,6 +18,19 @@ export class Player {
             null, null, null, null
         ];
 
+        // Knife / Tofu weapon animation state
+        this.knifeSwayTime = 0;
+        this.knifeStabbing = false;
+        this.knifeStabTimer = 0;
+        this.knifeBasePos = null; // will be set on first frame
+        this.knifeBaseRot = null;
+
+        // Body / walking animation state
+        this.bodyBobTime = 0;
+        this.bodyBaseY = null; // captured on first frame
+        this.hitStaggering = false;
+        this.hitStaggerTimer = 0;
+
         // Pickup Logic
         this.pendingCollectible = null;
         this.isPickupPromptOpen = false;
@@ -81,10 +94,138 @@ export class Player {
         const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
         if (playerEntity) {
             const health = playerEntity.components.Health;
-
             if (health) {
                 this.game.ui.updateHealth(health.current, health.max);
             }
+        }
+
+        // Animate knife (Tofu-style)
+        this._updateKnifeAnimation();
+
+        // Animate Tofu body sway / walk bob
+        this._updateBodyAnimation();
+    }
+
+    _updateBodyAnimation() {
+        const container = this.container;
+        if (!container) return;
+
+        // Grab InputState from the ECS player entity
+        const playerEntity = this.entity;
+        if (!playerEntity) return;
+        const input = playerEntity.components.InputState;
+        if (!input) return;
+
+        const isMoving = input.forward || input.backward || input.left || input.right;
+        const isRunning = isMoving && input.run;
+        const dt = 0.016;
+
+        // Capture base Y on first frame
+        if (this.bodyBaseY === null) {
+            this.bodyBaseY = container.position.y;
+        }
+
+        if (this.hitStaggering) {
+            // --- Hit Stagger: stumble backward ---
+            this.hitStaggerTimer += dt;
+            const total = 0.4;
+            const t = Math.min(this.hitStaggerTimer / total, 1.0);
+
+            const stagger = Math.sin(t * Math.PI);
+            // Tilt forward dramatically, then snap back
+            container.rotation.x = -stagger * 0.35;
+            // Shake side to side once
+            container.rotation.z = Math.sin(t * Math.PI * 2) * 0.12;
+            container.position.y = (this.bodyBaseY || 0) - stagger * 0.15;
+
+            if (t >= 1.0) {
+                this.hitStaggering = false;
+                this.hitStaggerTimer = 0;
+                container.rotation.x = 0;
+                container.rotation.z = 0;
+                container.position.y = this.bodyBaseY || 0;
+            }
+            return;
+        }
+
+        if (isMoving) {
+            // --- Walking Bob + Sway ---
+            const speed = isRunning ? 9 : 6; // Faster tempo when running
+            this.bodyBobTime += dt * speed;
+
+            // Vertical bob (bounce)
+            const bobAmt = isRunning ? 0.07 : 0.04;
+            container.position.y = (this.bodyBaseY || 0) + Math.abs(Math.sin(this.bodyBobTime)) * bobAmt;
+
+            // Side-to-side roll (Tofu signature waddle)
+            const swayAmt = isRunning ? 0.12 : 0.07;
+            container.rotation.z = Math.sin(this.bodyBobTime) * swayAmt;
+
+            // Arms swing alternately (very Tofu)
+            // Since hands are child meshes added at ±0.35x, rotate the whole container
+            // slightly to simulate walking arm swing
+            container.rotation.x = Math.sin(this.bodyBobTime * 0.5) * 0.04;
+        } else {
+            // --- Idle: damp back to neutral ---
+            container.rotation.z *= 0.85;
+            container.rotation.x *= 0.85;
+            container.position.y += ((this.bodyBaseY || 0) - container.position.y) * 0.15;
+        }
+    }
+
+    triggerHitStagger() {
+        if (!this.container || this.hitStaggering) return;
+        this.hitStaggering = true;
+        this.hitStaggerTimer = 0;
+    }
+
+    _updateKnifeAnimation() {
+        const knife = this.gun;
+        if (!knife) return;
+
+        // Capture base position on first call
+        if (!this.knifeBasePos) {
+            this.knifeBasePos = knife.position.clone();
+            this.knifeBaseRot = knife.rotation.clone();
+        }
+
+        const dt = 0.016; // Approx 60fps tick
+
+        if (this.knifeStabbing) {
+            this.knifeStabTimer += dt;
+            const kickDuration = 0.08;   // Fast snap upward (like real gun recoil)
+            const returnDuration = 0.22; // Slower settle back
+            const total = kickDuration + returnDuration;
+
+            if (this.knifeStabTimer < kickDuration) {
+                // Phase 1: Snap UP and slightly BACK — gun recoil impulse
+                const p = this.knifeStabTimer / kickDuration;
+                const ease = 1 - Math.pow(1 - p, 2);
+                knife.position.y = this.knifeBasePos.y + ease * 0.18;
+                knife.position.z = this.knifeBasePos.z + ease * 0.12; // Kick back
+                knife.rotation.x = this.knifeBaseRot.x - ease * 0.35; // Muzzle flip up
+            } else if (this.knifeStabTimer < total) {
+                // Phase 2: Float back down smoothly
+                const p = (this.knifeStabTimer - kickDuration) / returnDuration;
+                const ease = 1 - Math.pow(1 - p, 3);
+                knife.position.y = (this.knifeBasePos.y + 0.18) - ease * 0.18;
+                knife.position.z = (this.knifeBasePos.z + 0.12) - ease * 0.12;
+                knife.rotation.x = (this.knifeBaseRot.x - 0.35) + ease * 0.35;
+            } else {
+                // Reset
+                knife.position.copy(this.knifeBasePos);
+                knife.rotation.copy(this.knifeBaseRot);
+                this.knifeStabbing = false;
+                this.knifeStabTimer = 0;
+            }
+        } else {
+            // Idle sway: gentle arm hold breathing motion
+            this.knifeSwayTime += dt * 1.2;
+            const sway = Math.sin(this.knifeSwayTime) * 0.004;
+            const bob = Math.cos(this.knifeSwayTime * 0.6) * 0.003;
+            knife.position.y = this.knifeBasePos.y + sway;
+            knife.position.x = this.knifeBasePos.x + bob;
+            knife.rotation.z = this.knifeBaseRot.z + bob * 0.2;
         }
     }
 
