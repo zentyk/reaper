@@ -94,6 +94,10 @@ export class MovementSystem {
         if (meshComp && meshComp.mesh) {
             meshComp.mesh.position.copy(transform.position);
             meshComp.mesh.rotation.copy(transform.rotation);
+
+            // Apply directional lean additively on top of base rotation
+            if (transform.leanX !== undefined) meshComp.mesh.rotation.x += transform.leanX;
+            if (transform.leanZ !== undefined) meshComp.mesh.rotation.z += transform.leanZ;
         }
     }
 }

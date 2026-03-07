@@ -110,15 +110,20 @@ export class Player {
         const container = this.container;
         if (!container) return;
 
-        // Grab InputState from the ECS player entity
         const playerEntity = this.entity;
         if (!playerEntity) return;
         const input = playerEntity.components.InputState;
-        if (!input) return;
+        const transform = playerEntity.components.Transform;
+        if (!input || !transform) return;
 
         const isMoving = input.forward || input.backward || input.left || input.right;
         const isRunning = isMoving && input.run;
         const dt = 0.016;
+        const lerpSpeed = 0.14;
+
+        // Init lean fields on transform if absent
+        if (transform.leanX === undefined) transform.leanX = 0;
+        if (transform.leanZ === undefined) transform.leanZ = 0;
 
         // Capture base Y on first frame
         if (this.bodyBaseY === null) {
@@ -130,45 +135,50 @@ export class Player {
             this.hitStaggerTimer += dt;
             const total = 0.4;
             const t = Math.min(this.hitStaggerTimer / total, 1.0);
-
             const stagger = Math.sin(t * Math.PI);
-            // Tilt forward dramatically, then snap back
-            container.rotation.x = -stagger * 0.35;
-            // Shake side to side once
-            container.rotation.z = Math.sin(t * Math.PI * 2) * 0.12;
+
+            transform.leanX = -stagger * 0.38;
+            transform.leanZ = Math.sin(t * Math.PI * 2) * 0.14;
             container.position.y = (this.bodyBaseY || 0) - stagger * 0.15;
 
             if (t >= 1.0) {
                 this.hitStaggering = false;
                 this.hitStaggerTimer = 0;
-                container.rotation.x = 0;
-                container.rotation.z = 0;
+                transform.leanX = 0;
+                transform.leanZ = 0;
                 container.position.y = this.bodyBaseY || 0;
             }
             return;
         }
 
+        // --- Compute lean targets based on directional input ---
+        // Forward = lean into movement; Backward = lean backward (stronger recoil feel)
+        let targetLeanX = 0;
+        if (input.forward) targetLeanX = isRunning ? 0.25 : 0.16;
+        if (input.backward) targetLeanX = isRunning ? -0.35 : -0.24;
+
+        // Strafe left/right tilt (relative to the player's facing which is transform.rotation.y)
+        let targetLeanZ = 0;
+        if (input.left) targetLeanZ = isRunning ? 0.20 : 0.13;
+        if (input.right) targetLeanZ = isRunning ? -0.20 : -0.13;
+
+        // Smooth lerp toward targets — written to transform so MovementSystem picks them up
+        transform.leanX += (targetLeanX - transform.leanX) * lerpSpeed;
+        transform.leanZ += (targetLeanZ - transform.leanZ) * lerpSpeed;
+
         if (isMoving) {
-            // --- Walking Bob + Sway ---
-            const speed = isRunning ? 9 : 6; // Faster tempo when running
+            // --- Walking bob (Y position) ---
+            const speed = isRunning ? 9 : 6;
             this.bodyBobTime += dt * speed;
 
-            // Vertical bob (bounce)
             const bobAmt = isRunning ? 0.07 : 0.04;
             container.position.y = (this.bodyBaseY || 0) + Math.abs(Math.sin(this.bodyBobTime)) * bobAmt;
 
-            // Side-to-side roll (Tofu signature waddle)
-            const swayAmt = isRunning ? 0.12 : 0.07;
-            container.rotation.z = Math.sin(this.bodyBobTime) * swayAmt;
-
-            // Arms swing alternately (very Tofu)
-            // Since hands are child meshes added at ±0.35x, rotate the whole container
-            // slightly to simulate walking arm swing
-            container.rotation.x = Math.sin(this.bodyBobTime * 0.5) * 0.04;
+            // Layer a subtle waddle sway ON TOP of the directional lean
+            const swayAmt = isRunning ? 0.04 : 0.025;
+            transform.leanZ += Math.sin(this.bodyBobTime) * swayAmt;
         } else {
-            // --- Idle: damp back to neutral ---
-            container.rotation.z *= 0.85;
-            container.rotation.x *= 0.85;
+            // Damp Y bob back to rest
             container.position.y += ((this.bodyBaseY || 0) - container.position.y) * 0.15;
         }
     }
