@@ -1,30 +1,15 @@
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>REAPER</title>
-    <link rel="stylesheet" href="css/styles.css">
 </head>
 
 <body>
-    <start-screen id="startScreen"></start-screen>
-    <game-over-screen id="gameOverScreen"></game-over-screen>
-    <div id="fadeOverlay" class="fade-overlay"></div>
-    <div id="levelText" class="level-text">Level 1</div>
-
-    <inventory-screen id="inventoryScreen"></inventory-screen>
-    <context-menu id="contextMenu"></context-menu>
-    <pickup-prompt id="pickupPrompt"></pickup-prompt>
-    <game-hud id="hud"></game-hud>
-
-    <!-- Import UI Web Components statically before Main -->
-    <script type="module" src="js/components/ui/StartScreen.js"></script>
-    <script type="module" src="js/components/ui/GameOverScreen.js"></script>
-    <script type="module" src="js/components/ui/GameHUD.js"></script>
-    <script type="module" src="js/components/ui/InventoryScreen.js"></script>
-    <script type="module" src="js/components/ui/ContextMenu.js"></script>
-    <script type="module" src="js/components/ui/PickupPrompt.js"></script>
-    <script type="module" src="js/main.js"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
 </body>
 
 </html>
