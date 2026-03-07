@@ -13,7 +13,7 @@ export class Player {
         this.lastIState = false;
 
         this.inventory = [
-            { id: 'handgun', name: 'Handgun', type: 'weapon', equipped: true, combinable: true, usable: false },
+            { id: 'handgun', name: 'Handgun', type: 'weapon', equipped: true, combinable: true, usable: false, ammo: 15 },
             { id: 'ammo', name: 'Ammo', type: 'ammo', count: 30, combinable: true, usable: false },
             null, null, null, null
         ];
@@ -59,6 +59,12 @@ export class Player {
             if (this.isPickupMode) {
                 this.closePickupPrompt();
             }
+        });
+
+        // Handle Escape/Exit buttons from the Vue UI returning to Gameplay
+        document.addEventListener('inventory-close', () => {
+            this.isInventoryOpen = false;
+            this.game.isPaused = false;
         });
     }
 

@@ -133,6 +133,9 @@ export class Game {
         // Load Level 1
         this.levelManager.loadLevel(1);
 
+        // Init Debug UI values
+        this.ui.updateAmmo(15, 30);
+
         // Update AISystem with new pathfinder
         const aiSystem = this.world.systems.find(s => s instanceof AISystem);
         if (aiSystem) {

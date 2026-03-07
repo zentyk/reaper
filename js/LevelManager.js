@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { Transform, MeshComponent, PlayerTag, ZombieTag, ObstacleTag, CollectibleTag, DoorTag, Health, Movement, AI, Collider, Weapon, Inventory } from './components.js';
+import { store } from '../src/store.js';
 
 export class LevelManager {
     constructor(game) {
@@ -183,8 +184,8 @@ export class LevelManager {
         this.game.cameras.north.lookAt(0, 0, 0);
         this.game.activeCamera = this.game.cameras.north;
 
-        // Player
-        this.createPlayer(0, 0, -8);
+        // Player (Spawn near the X=10 door)
+        this.createPlayer(8, 0, 0);
 
         // Obstacles
         this.createObstacle('l2_obs1', 0, 0, 4, 4); // Center pillar
@@ -206,6 +207,14 @@ export class LevelManager {
     }
 
     createPlayer(x, z) {
+        // Find persistent stats from global store to prevent level-load resets
+        const currentHealth = store.healthPercent; // Percent equals flat HP out of 100
+        let currentAmmo = 15;
+        const equippedWeapon = store.inventory.find(i => i && i.equipped && i.type === 'weapon');
+        if (equippedWeapon && equippedWeapon.ammo !== undefined) {
+            currentAmmo = equippedWeapon.ammo;
+        }
+
         // Container Group
         const container = new THREE.Group();
         container.position.set(x, 0, z);
@@ -239,11 +248,11 @@ export class LevelManager {
             new Transform(x, 0, z), // Transform matches container
             new MeshComponent(container),
             new PlayerTag(),
-            new Health(100, 100),
+            new Health(currentHealth, 100),
             new Movement(0.08, 0.04), // Movement speed
             new Collider(0.3),
             new Inventory(),
-            new Weapon(15, 15)
+            new Weapon(15, currentAmmo)
         ]);
 
         entity.rigidBody = rigidBody;
