@@ -148,5 +148,261 @@ canvas {
     color: var(--p-text-color);
     padding: 20px;
     border-radius: 5px;
-    z-index: 3000;
+    z-index: 10001;
+}
+
+/* --- Retro Inventory Overrides --- */
+@import url('https://fonts.googleapis.com/css2?family=Garamond&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
+.retro-inventory-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(10, 10, 12, 0.95);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: 'Garamond', 'Playfair Display', serif;
+    color: #c9c9c9;
+}
+
+.retro-inventory-container {
+    width: 900px;
+    height: 600px;
+    border: 2px solid #333;
+    background: #000;
+    box-shadow: inset 0 0 50px rgba(0, 0, 0, 1), 0 0 20px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Nav Bar */
+.retro-nav-bar {
+    height: 50px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 20px;
+    background: linear-gradient(to bottom, #1a1a1a, #0a0a0a);
+    border-bottom: 2px solid #222;
+}
+
+.nav-item {
+    margin-left: 20px;
+    padding: 5px 15px;
+    border-radius: 20px;
+    border: 1px solid #444;
+    color: #666;
+    font-size: 1.2rem;
+    cursor: default;
+}
+
+.active-nav {
+    border-color: #bc9c6a;
+    color: #bc9c6a;
+    box-shadow: 0 0 10px rgba(188, 156, 106, 0.2);
+}
+
+/* Split Layout */
+.retro-split-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.retro-left-panel {
+    flex: 2;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    border-right: 2px solid #222;
+}
+
+.retro-right-panel {
+    flex: 1;
+    padding: 20px;
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Viewer Box */
+.retro-viewer-box {
+    flex: 1;
+    border: 2px solid #333;
+    background: #050505;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+}
+
+.viewer-placeholder {
+    width: 100px;
+    height: 100px;
+    border: 2px dashed #bc9c6a;
+    animation: spin 4s linear infinite;
+    opacity: 0.5;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Prompts */
+.retro-prompt-box {
+    border: 2px solid #333;
+    padding: 20px;
+    background: #0a0a0a;
+}
+
+.prompt-text {
+    font-size: 1.5rem;
+    line-height: 1.4;
+    color: #aaa;
+}
+
+.prompt-highlight {
+    color: #608f60;
+    /* Classic green item text */
+    font-weight: bold;
+}
+
+.prompt-buttons {
+    margin-top: 15px;
+    display: flex;
+    gap: 20px;
+    justify-content: flex-end;
+}
+
+.retro-btn {
+    background: transparent;
+    border: 1px solid #555;
+    color: #ccc;
+    padding: 8px 30px;
+    font-family: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.retro-btn:hover {
+    border-color: #bc9c6a;
+    color: #bc9c6a;
+}
+
+.retro-footer-box {
+    border: 2px solid #222;
+    padding: 15px;
+    text-align: center;
+    font-style: italic;
+    color: #666;
+}
+
+/* Grid Slots */
+.retro-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(4, 1fr);
+    gap: 5px;
+    flex: 1;
+}
+
+.retro-slot {
+    border: 1px solid #333;
+    background: #111;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    transition: 0.2s;
+}
+
+.retro-slot:hover {
+    background: #1a1a1a;
+    border-color: #555;
+}
+
+.slot-active {
+    border-color: #bc9c6a;
+    box-shadow: inset 0 0 10px rgba(188, 156, 106, 0.2);
+}
+
+.slot-equipped {
+    border-color: #608f60;
+}
+
+.slot-content {
+    text-align: center;
+}
+
+.slot-name {
+    font-size: 1.1rem;
+    color: #aaa;
+}
+
+.slot-count {
+    color: #bc9c6a;
+    font-size: 1.2rem;
+    margin-top: 5px;
+}
+
+/* Status Block */
+.retro-status-block {
+    margin-top: 20px;
+    border-top: 2px solid #333;
+    padding-top: 10px;
+}
+
+.status-header {
+    text-align: center;
+    color: #888;
+    margin-bottom: 10px;
+    letter-spacing: 2px;
+}
+
+.status-content {
+    text-align: center;
+    font-size: 1.2rem;
+    color: #ccc;
+}
+
+.status-ammo {
+    color: #bc9c6a;
+    font-size: 1.5rem;
+    margin-top: 5px;
+}
+
+/* PrimeVue Context Menu Retro Overrides */
+.p-menu.context-menu--prime {
+    background: #0a0a0a;
+    border: 1px solid #bc9c6a;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.9);
+    font-family: 'Garamond', 'Playfair Display', serif;
+    color: #ccc;
+    font-size: 1.2rem;
+}
+
+.p-menu.context-menu--prime .p-menuitem-link {
+    background: transparent !important;
+    color: #ccc !important;
+    transition: all 0.2s;
+    padding: 10px 20px;
+}
+
+.p-menu.context-menu--prime .p-menuitem-link:hover,
+.p-menu.context-menu--prime .p-menuitem-link:focus {
+    background: #1a1a1a !important;
+    color: #bc9c6a !important;
+}
+
+.p-menu.context-menu--prime .p-menuitem-text {
+    color: inherit;
 }

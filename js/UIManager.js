@@ -91,6 +91,7 @@ export class UIManager {
     // Inventory UI methods
     toggleInventory(isOpen) {
         store.isInventoryVisible = isOpen;
+        store.examineText = '';
         if (!isOpen) {
             this.hideContextMenu();
         }
@@ -106,6 +107,7 @@ export class UIManager {
         }
 
         this._inventorySlotClickListener = (e) => {
+            store.examineText = '';
             onSlotClick(e.detail.index, e.detail.x, e.detail.y);
         };
 
@@ -125,12 +127,19 @@ export class UIManager {
         store.contextMenu.visible = false;
     }
 
-    showPickupPrompt(itemName) {
-        store.pickupPrompt.text = itemName;
-        store.isPickupPromptVisible = true;
+    examineItem(text) {
+        store.examineText = text;
     }
 
-    hidePickupPrompt() {
-        store.isPickupPromptVisible = false;
+    openPickupMode(itemName) {
+        store.pickupItemName = itemName;
+        store.isPickupMode = true;
+        store.isInventoryVisible = true;
+    }
+
+    closePickupMode() {
+        store.isPickupMode = false;
+        store.isInventoryVisible = false;
+        store.pickupItemName = '';
     }
 }

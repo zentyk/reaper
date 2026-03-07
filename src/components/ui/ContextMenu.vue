@@ -3,7 +3,7 @@
     v-if="store.contextMenu.visible"
     :model="menuItems"
     class="context-menu--prime"
-    :style="{ position: 'absolute', left: store.contextMenu.x + 'px', top: store.contextMenu.y + 'px', zIndex: 2000 }"
+    :style="{ position: 'absolute', left: store.contextMenu.x + 'px', top: store.contextMenu.y + 'px', zIndex: 10000 }"
   />
 </template>
 

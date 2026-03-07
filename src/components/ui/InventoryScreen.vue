@@ -1,48 +1,126 @@
 <template>
-  <Dialog v-model:visible="store.isInventoryVisible" header="INVENTORY" :modal="true" :closable="false" :style="{ width: '50vw' }">
-    <div v-if="store.combineSourceIndex !== null" style="color: var(--p-primary-color); margin-bottom: 1rem; text-align: center; font-weight: bold;">
-      Select item to combine with...
-    </div>
+  <div v-show="store.isInventoryVisible" class="retro-inventory-overlay">
     
-    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
-      <Card 
-        v-for="(item, index) in store.inventory" 
-        :key="index"
-        style="cursor: pointer; text-align: center; height: 120px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;"
-        :style="{ 
-          border: store.combineSourceIndex === index ? '2px solid var(--p-primary-color)' : item && item.equipped ? '2px solid var(--p-green-500)' : '2px solid transparent',
-          backgroundColor: item ? 'var(--p-surface-800)' : 'var(--p-surface-900)'
-        }"
-        @click="onSlotClick(index, $event)"
-      >
-        <template #content>
-          <div v-if="item" style="font-weight: bold;">
-            {{ item.name }}
-            <br v-if="item.count !== undefined">
-            <Badge v-if="item.count !== undefined" :value="'x' + item.count" severity="info" style="margin-top: 0.5rem;"></Badge>
-          </div>
-          <div v-else style="color: var(--p-text-muted-color);">Empty</div>
-        </template>
-      </Card>
-    </div>
+    <!-- Main Inventory Container -->
+    <div class="retro-inventory-container">
+      
+      <!-- Top Nav Bar (Decorative for now to match reference) -->
+      <div class="retro-nav-bar">
+        <div class="nav-item" style="cursor: pointer;" @click="onExitClick"><span>Exit</span></div>
+        <div class="nav-item"><span>Files</span></div>
+        <div class="nav-item"><span>Map</span></div>
+        <div class="nav-item active-nav"><i class="pi pi-briefcase"></i></div>
+      </div>
 
-    <template #footer>
-      <div style="text-align: center; width: 100%; color: var(--p-text-muted-color);">Press [I] to close</div>
-    </template>
-  </Dialog>
+      <!-- Split Layout -->
+      <div class="retro-split-layout">
+        
+        <!-- Left Side: Viewer & Prompts -->
+        <div class="retro-left-panel">
+          
+          <!-- Item 3D Viewer Placeholder -->
+          <div class="retro-viewer-box">
+             <div v-if="activeItem" class="viewer-placeholder">
+               <!-- In a real game, output WebGL render target here -->
+               <div class="spinning-box"></div>
+             </div>
+             <div v-else class="viewer-empty"></div>
+          </div>
+
+          <!-- Pickup Mode Prompt -->
+          <div v-if="store.isPickupMode" class="retro-prompt-box">
+            <div class="prompt-text">
+              Will you take the<br>
+              <span class="prompt-highlight">{{ store.pickupItemName }}</span>?
+            </div>
+            <div class="prompt-buttons">
+              <button class="retro-btn" @click="onYes">Yes</button>
+              <button class="retro-btn" @click="onNo">No</button>
+            </div>
+          </div>
+          
+          <!-- Default Footer status -->
+          <div v-else class="retro-footer-box">
+             <span v-if="store.examineText" style="color: #ccc;">{{ store.examineText }}</span>
+             <span v-else-if="store.combineSourceIndex !== null" style="color: #bc9c6a;">Select item to combine...</span>
+             <span v-else>Press [I] to close. Right-click slot for options.</span>
+          </div>
+
+        </div>
+
+        <!-- Right Side: Inventory Grid -->
+        <div class="retro-right-panel">
+          <div class="retro-grid">
+            <div 
+              v-for="(item, index) in store.inventory" 
+              :key="index"
+              class="retro-slot"
+              :class="{ 
+                'slot-active': store.combineSourceIndex === index,
+                'slot-equipped': item && item.equipped 
+              }"
+              @click="onSlotClick(index, $event)"
+              @mouseenter="hoverItem(item)"
+            >
+              <div v-if="item" class="slot-content">
+                <div class="slot-name">{{ item.name }}</div>
+                <div v-if="item.count !== undefined" class="slot-count">{{ item.count }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Equipped Weapon / Status Block -->
+          <div class="retro-status-block">
+             <div class="status-header">Weapon</div>
+             <div class="status-content" v-if="equippedWeapon">
+                {{ equippedWeapon.name }}
+                <div class="status-ammo">{{ equippedWeapon.ammo || '∞' }}</div>
+             </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
+import { ref, computed } from 'vue'
 import { store } from '../../store.js'
-import Dialog from 'primevue/dialog'
-import Card from 'primevue/card'
-import Badge from 'primevue/badge'
+
+const activeItem = ref(null);
+
+const equippedWeapon = computed(() => {
+  return store.inventory.find(i => i && i.equipped && i.type === 'weapon');
+});
+
+function hoverItem(item) {
+   if (item) activeItem.ref = item;
+}
 
 function onSlotClick(index, event) {
   if (store.inventory[index] || store.combineSourceIndex !== null) {
+      activeItem.value = store.inventory[index];
       document.dispatchEvent(new CustomEvent('slot-click', { 
         detail: { index, x: event.clientX, y: event.clientY }
       }));
   }
+}
+
+// Pickup Mode Handlers
+function onYes() {
+  document.dispatchEvent(new CustomEvent('pickup-yes'));
+}
+
+function onNo() {
+  document.dispatchEvent(new CustomEvent('pickup-no'));
+}
+
+function onExitClick() {
+  store.examineText = '';
+  store.combineSourceIndex = null;
+  store.isInventoryVisible = false;
+  // Trigger external pause toggle
+  document.dispatchEvent(new CustomEvent('inventory-close'));
 }
 </script>

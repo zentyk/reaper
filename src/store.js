@@ -9,6 +9,7 @@ export const store = reactive({
     // Inventory
     isPickupMode: false,
     pickupItemName: '',
+    examineText: '',
 
     // HUD
     healthPercent: 100,

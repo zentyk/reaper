@@ -49,14 +49,14 @@ export class Player {
 
     setupPickupUI() {
         document.addEventListener('pickup-yes', () => {
-            if (this.isPickupPromptOpen) {
+            if (this.isPickupMode) {
                 this.collectItem();
                 this.closePickupPrompt();
             }
         });
 
         document.addEventListener('pickup-no', () => {
-            if (this.isPickupPromptOpen) {
+            if (this.isPickupMode) {
                 this.closePickupPrompt();
             }
         });
@@ -140,7 +140,7 @@ export class Player {
             if (playerEntity && playerEntity.components.Health) {
                 const health = playerEntity.components.Health;
                 health.current = Math.min(100, health.current + item.amount);
-                this.game.ui.showFeedback("Health Restored");
+                this.game.ui.examineItem("Health Restored");
                 this.inventory[index] = null;
                 this.renderInventory();
             }
@@ -199,7 +199,7 @@ export class Player {
             const ammoItem = source.id === 'ammo' ? source : target;
             this.instantReload(ammoItem);
         } else {
-            this.game.ui.showFeedback("This action cannot be done");
+            this.game.ui.examineItem("This action cannot be done");
         }
 
         this.combineSourceIndex = null;
@@ -213,7 +213,7 @@ export class Player {
         const weapon = playerEntity.components.Weapon;
 
         if (weapon.ammo >= weapon.maxAmmo) {
-            this.game.ui.showFeedback("Clip is already full.");
+            this.game.ui.examineItem("Clip is already full.");
             return;
         }
 
@@ -221,34 +221,34 @@ export class Player {
         const toLoad = Math.min(needed, ammoItem.count);
 
         if (toLoad <= 0) {
-            this.game.ui.showFeedback("No ammo remaining.");
+            this.game.ui.examineItem("No ammo remaining.");
             return;
         }
 
         weapon.ammo += toLoad;
         ammoItem.count -= toLoad;
 
-        this.game.ui.showFeedback("Reloaded!");
+        this.game.ui.examineItem("Reloaded!");
         this.game.ui.updateAmmo(weapon.ammo, ammoItem.count); // Update UI immediately
     }
 
     examineItem(index) {
-        this.game.ui.showFeedback(`It's a ${this.inventory[index].name}.`);
+        this.game.ui.examineItem(`It's a ${this.inventory[index].name}.`);
     }
 
     // Pickup Logic
     openPickupPrompt(item) {
         this.game.isPaused = true;
-        this.isPickupPromptOpen = true;
+        this.isPickupMode = true;
         this.pendingCollectible = item;
-        this.game.ui.showPickupPrompt(item.components.CollectibleTag.name);
+        this.game.ui.openPickupMode(item.components.CollectibleTag.name);
     }
 
     closePickupPrompt() {
         this.game.isPaused = false;
-        this.isPickupPromptOpen = false;
+        this.isPickupMode = false;
         this.pendingCollectible = null;
-        this.game.ui.hidePickupPrompt();
+        this.game.ui.closePickupMode();
     }
 
     collectItem() {
