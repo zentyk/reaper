@@ -1,7 +1,37 @@
+:root {
+    /* Base Colors */
+    --color-bg-body: #000;
+    --color-bg-base: #111;
+    --color-bg-panel: #222;
+    --color-bg-button: #333;
+    --color-bg-hover: #444;
+    --color-bg-accent: #555;
+
+    /* Text / Core UI */
+    --color-text-main: white;
+    --color-text-muted: #aaa;
+    --color-border-main: #555;
+
+    /* Semantic Actions */
+    --color-success: #00ff00;
+    --color-success-bg: #00aa00;
+    --color-warning: yellow;
+    --color-danger: red;
+    --color-danger-dark: #880000;
+
+    /* Overlays */
+    --color-overlay-dark: rgba(0, 0, 0, 0.85);
+    --color-overlay-hud: rgba(0, 0, 0, 0.5);
+
+    /* Specific Highlights */
+    --color-highlight-combine: #ff00ff;
+}
+
 body {
     margin: 0;
     overflow: hidden;
     font-family: 'Courier New', Courier, monospace;
+    background-color: var(--color-bg-body);
 }
 
 canvas {
@@ -15,7 +45,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: black;
+    background-color: var(--color-bg-body);
     z-index: 30;
     opacity: 0;
     pointer-events: none;
@@ -29,7 +59,7 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: #111;
+    background-color: var(--color-bg-base);
     display: flex;
     /* Can be toggled to flex via JS/WebComponent attached-styles but default depends on implementation. We define block style here. */
     justify-content: center;
@@ -44,25 +74,25 @@ canvas {
 }
 
 .start-screen__title {
-    color: white;
+    color: var(--color-text-main);
     font-size: 4rem;
     margin-bottom: 50px;
-    text-shadow: 0 0 10px #00ff00;
+    text-shadow: 0 0 10px var(--color-success);
 }
 
 .start-screen__button {
     padding: 20px 40px;
     font-size: 2rem;
-    background-color: #333;
-    color: white;
-    border: 2px solid #555;
+    background-color: var(--color-bg-button);
+    color: var(--color-text-main);
+    border: 2px solid var(--color-border-main);
     cursor: pointer;
     font-family: 'Courier New', Courier, monospace;
     transition: background-color 0.3s;
 }
 
 .start-screen__button:hover {
-    background-color: #555;
+    background-color: var(--color-bg-accent);
 }
 
 /* --- Block: Game Over Screen --- */
@@ -88,18 +118,18 @@ canvas {
 }
 
 .game-over-screen--white {
-    background-color: white;
+    background-color: var(--color-text-main);
 }
 
 .game-over-screen--black {
-    background-color: black;
+    background-color: var(--color-bg-body);
 }
 
 .game-over-screen__text {
-    color: #880000;
+    color: var(--color-danger-dark);
     font-size: 5rem;
     font-weight: bold;
-    text-shadow: 0 0 10px red;
+    text-shadow: 0 0 10px var(--color-danger);
     opacity: 0;
     transition: opacity 2s ease-in;
 }
@@ -113,10 +143,10 @@ canvas {
     position: absolute;
     top: 20px;
     right: 20px;
-    color: white;
+    color: var(--color-text-main);
     font-size: 1.5rem;
     font-weight: bold;
-    text-shadow: 0 0 5px black;
+    text-shadow: 0 0 5px var(--color-bg-body);
     z-index: 10;
 }
 
@@ -138,9 +168,9 @@ canvas {
 
 /* --- Block: HUD Display Element --- */
 .hud-display {
-    color: white;
+    color: var(--color-text-main);
     font-size: 1.5rem;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--color-overlay-hud);
     padding: 10px;
     border-radius: 5px;
     display: flex;
@@ -150,8 +180,8 @@ canvas {
 .hud-display__bar {
     width: 200px;
     height: 20px;
-    background-color: #333;
-    border: 1px solid #555;
+    background-color: var(--color-bg-button);
+    border: 1px solid var(--color-border-main);
     margin-left: 10px;
 }
 
@@ -163,11 +193,11 @@ canvas {
 }
 
 .hud-display__value--warning {
-    background-color: yellow;
+    background-color: var(--color-warning);
 }
 
 .hud-display__value--critical {
-    background-color: red;
+    background-color: var(--color-danger);
 }
 
 .hud-display__text {
@@ -184,9 +214,9 @@ canvas {
 
 .hud__cheat-btn {
     pointer-events: auto;
-    background-color: #333;
-    color: white;
-    border: 1px solid #555;
+    background-color: var(--color-bg-button);
+    color: var(--color-text-main);
+    border: 1px solid var(--color-border-main);
     padding: 5px 10px;
     border-radius: 5px;
     cursor: pointer;
@@ -195,9 +225,13 @@ canvas {
     width: fit-content;
 }
 
+.hud__cheat-btn:hover {
+    background-color: var(--color-bg-accent);
+}
+
 .hud__cheat-btn--active {
-    background-color: #00aa00;
-    border-color: #00ff00;
+    background-color: var(--color-success-bg);
+    border-color: var(--color-success);
 }
 
 /* --- Block: Inventory Screen --- */
@@ -207,13 +241,13 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.85);
+    background-color: var(--color-overlay-dark);
     display: none;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 5;
-    color: white;
+    color: var(--color-text-main);
 }
 
 .inventory-screen--visible {
@@ -223,7 +257,7 @@ canvas {
 .inventory-screen__title {
     font-size: 3rem;
     margin-bottom: 20px;
-    border-bottom: 2px solid white;
+    border-bottom: 2px solid var(--color-text-main);
     padding-bottom: 10px;
 }
 
@@ -241,8 +275,8 @@ canvas {
 .inventory-slot {
     width: 100px;
     height: 100px;
-    border: 2px solid #555;
-    background-color: #222;
+    border: 2px solid var(--color-border-main);
+    background-color: var(--color-bg-panel);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -253,17 +287,17 @@ canvas {
 }
 
 .inventory-slot--item {
-    background-color: #333;
+    background-color: var(--color-bg-button);
 }
 
 .inventory-slot--equipped {
-    border-color: #00ff00;
-    box-shadow: 0 0 10px #00ff00;
+    border-color: var(--color-success);
+    box-shadow: 0 0 10px var(--color-success);
 }
 
 .inventory-slot--combining {
-    border-color: #ff00ff;
-    box-shadow: 0 0 10px #ff00ff;
+    border-color: var(--color-highlight-combine);
+    box-shadow: 0 0 10px var(--color-highlight-combine);
 }
 
 .inventory-screen__instruction {
@@ -272,20 +306,20 @@ canvas {
     left: 0;
     width: 100%;
     text-align: center;
-    color: #ff00ff;
+    color: var(--color-highlight-combine);
 }
 
 .inventory-screen__close-hint {
     margin-top: 20px;
     font-size: 1.2rem;
-    color: #aaa;
+    color: var(--color-text-muted);
 }
 
 /* --- Block: Context Menu --- */
 .context-menu {
     position: absolute;
-    background-color: #222;
-    border: 1px solid #555;
+    background-color: var(--color-bg-panel);
+    border: 1px solid var(--color-border-main);
     display: none;
     flex-direction: column;
     z-index: 100;
@@ -298,13 +332,13 @@ canvas {
 
 .context-menu__option {
     padding: 10px;
-    color: white;
+    color: var(--color-text-main);
     cursor: pointer;
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--color-bg-hover);
 }
 
 .context-menu__option:hover {
-    background-color: #444;
+    background-color: var(--color-bg-hover);
 }
 
 .context-menu__option:last-child {
@@ -323,9 +357,9 @@ canvas {
     left: 50%;
     transform: translateX(-50%);
     background-color: rgba(0, 0, 0, 0.8);
-    color: white;
+    color: var(--color-text-main);
     padding: 20px;
-    border: 2px solid white;
+    border: 2px solid var(--color-text-main);
     display: none;
     flex-direction: column;
     align-items: center;
@@ -349,9 +383,9 @@ canvas {
 }
 
 .pickup-prompt__button {
-    background-color: #333;
-    color: white;
-    border: 1px solid #555;
+    background-color: var(--color-bg-button);
+    color: var(--color-text-main);
+    border: 1px solid var(--color-border-main);
     padding: 10px 20px;
     cursor: pointer;
     font-family: 'Courier New', Courier, monospace;
@@ -359,7 +393,7 @@ canvas {
 }
 
 .pickup-prompt__button:hover {
-    background-color: #555;
+    background-color: var(--color-bg-accent);
 }
 
 .feedback-message {
@@ -368,7 +402,7 @@ canvas {
     left: 50%;
     transform: translateX(-50%);
     background-color: rgba(0, 0, 0, 0.8);
-    color: white;
+    color: var(--color-text-main);
     padding: 20px;
     border-radius: 5px;
     z-index: 1000;
