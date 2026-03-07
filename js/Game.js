@@ -178,7 +178,11 @@ export class Game {
 
         if (!this.isPaused) {
             this.world.update(dt);
-            this.levelManager.update(dt);
+
+            // Check again in case a system (like CombatSystem triggering a cutscene) paused the game
+            if (!this.isPaused) {
+                this.levelManager.update(dt);
+            }
 
             // Cleanup destroyed entities
             for (let i = this.world.entities.length - 1; i >= 0; i--) {
