@@ -1,5 +1,5 @@
 import { Transform, AI, ZombieTag, PlayerTag, Movement, MeshComponent, Grapple, ObstacleTag, Collider } from '../components.js';
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 
 export class AISystem {
     constructor(pathfinder) {
@@ -13,7 +13,7 @@ export class AISystem {
         const playerPos = player.components.Transform.position;
         const grapple = player.components.Grapple;
         const isPlayerGrappled = grapple ? grapple.isGrappled : false;
-        
+
         const obstacles = entities.filter(e => e.components.ObstacleTag);
 
         for (const entity of entities) {
@@ -34,18 +34,18 @@ export class AISystem {
             ai.knockDownTimer -= dt;
             if (ai.knockDownTimer <= 0) {
                 ai.state = 'chase'; // Stand up
-                
+
                 // Reset Transform
                 transform.position.y = 0.9;
                 transform.rotation.x = 0;
-                
+
                 // Reset Mesh
                 if (meshComp && meshComp.mesh) {
                     meshComp.mesh.rotation.x = 0;
                     meshComp.mesh.position.y = 0.9;
                     // Ensure color is reset if it wasn't already
                     if (meshComp.mesh.material.color.getHex() === 0xff00ff) { // If still purple
-                         meshComp.mesh.material.color.setHex(0x0000ff);
+                        meshComp.mesh.material.color.setHex(0x0000ff);
                     }
                 }
             }
@@ -83,13 +83,13 @@ export class AISystem {
             }
 
             let moveTarget = targetPos;
-            
+
             // Follow path if available
             if (ai.path && ai.path.length > 0) {
                 const nextPoint = ai.path[0];
                 const dist = new THREE.Vector3(transform.position.x, 0, transform.position.z)
                     .distanceTo(new THREE.Vector3(nextPoint.x, 0, nextPoint.z));
-                
+
                 if (dist < 0.5) {
                     ai.path.shift();
                     if (ai.path.length > 0) {
@@ -104,11 +104,11 @@ export class AISystem {
             const dir = new THREE.Vector3().subVectors(moveTarget, transform.position);
             dir.y = 0;
             dir.normalize();
-            
+
             // Axis-independent movement for sliding
             const dx = dir.x * movement.speed;
             const dz = dir.z * movement.speed;
-            
+
             // Try moving X
             let nextPos = transform.position.clone();
             nextPos.x += dx;
@@ -122,7 +122,7 @@ export class AISystem {
             if (!this.checkCollision(nextPos, entity, obstacles)) {
                 transform.position.z += dz;
             }
-            
+
             // Look at
             if (dir.lengthSq() > 0) {
                 const lookTarget = new THREE.Vector3(moveTarget.x, transform.position.y, moveTarget.z);
@@ -138,7 +138,7 @@ export class AISystem {
             meshComp.mesh.position.copy(transform.position);
         }
     }
-    
+
     checkCollision(pos, entity, obstacles) {
         const collider = entity.components.Collider;
         if (!collider) return false;
@@ -151,12 +151,12 @@ export class AISystem {
         for (const obs of obstacles) {
             const obsCollider = obs.components.Collider;
             const obsTransform = obs.components.Transform;
-            
+
             if (obsCollider && obsTransform) {
                 const obsBox = new THREE.Box3();
                 if (obs.components.MeshComponent && obs.components.MeshComponent.mesh.geometry.boundingBox) {
-                     const mesh = obs.components.MeshComponent.mesh;
-                     obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+                    const mesh = obs.components.MeshComponent.mesh;
+                    obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
                 } else {
                     const min = new THREE.Vector3(obsTransform.position.x - obsCollider.radius, 0, obsTransform.position.z - obsCollider.radius);
                     const max = new THREE.Vector3(obsTransform.position.x + obsCollider.radius, 2, obsTransform.position.z + obsCollider.radius);

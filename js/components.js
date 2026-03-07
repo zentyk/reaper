@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 
 // --- Data Components ---
 
@@ -13,13 +13,13 @@ export class MeshComponent {
     constructor(mesh) {
         this.mesh = mesh;
         // Optional: Store child references for easy access (e.g., gun)
-        this.gun = mesh.getObjectByName('gun') || null; 
+        this.gun = mesh.getObjectByName('gun') || null;
     }
 }
 
-export class PlayerTag {}
-export class ZombieTag {}
-export class ObstacleTag {}
+export class PlayerTag { }
+export class ZombieTag { }
+export class ObstacleTag { }
 export class CollectibleTag {
     constructor(type, amount, name) {
         this.type = type;

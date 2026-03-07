@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 import { Zombie } from '../Zombie.js';
 
 export function setupLevel1(game) {

@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 import { World } from './ecs/World.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { MovementSystem } from './systems/MovementSystem.js';

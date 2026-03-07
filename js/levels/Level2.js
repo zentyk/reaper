@@ -1,19 +1,19 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 import { Zombie } from '../Zombie.js';
 
 export function setupLevel2(game) {
     // --- Level Configuration ---
-    
+
     // Audio
     game.audio.playMusic(2);
 
     // Cameras
     game.cameras.north.position.set(0, 15, -15);
     game.cameras.north.lookAt(0, 0, 0);
-    
+
     game.cameras.south.position.set(0, 15, 15);
     game.cameras.south.lookAt(0, 0, 0);
-    
+
     game.activeCamera = game.cameras.north;
 
     // Lights - Clear and Re-add
@@ -76,7 +76,7 @@ export function setupLevel2(game) {
         if (game.gameState.isZombieDead(2, data.id)) return;
         game.levelManager.createZombie(data.pos[0], data.pos[2]);
     });
-    
+
     // Set Player Spawn
     game.player.container.position.set(0, 0, -8);
 }

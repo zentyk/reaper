@@ -1,10 +1,10 @@
 import { Transform, Movement, PlayerTag, Collider, ObstacleTag, InputState, Grapple } from '../components.js';
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 
 export class MovementSystem {
     update(entities, dt) {
         const obstacles = entities.filter(e => e.components.ObstacleTag);
-        
+
         for (const entity of entities) {
             if (entity.components.PlayerTag && entity.components.Transform && entity.components.Movement && entity.components.InputState) {
                 this.handlePlayerMovement(entity, obstacles);
@@ -30,7 +30,7 @@ export class MovementSystem {
         // Position
         let dx = 0;
         let dz = 0;
-        
+
         const speed = input.run ? movement.speed * 2 : movement.speed;
 
         if (input.forward) {
@@ -78,12 +78,12 @@ export class MovementSystem {
         for (const obs of obstacles) {
             const obsCollider = obs.components.Collider;
             const obsTransform = obs.components.Transform;
-            
+
             if (obsCollider && obsTransform) {
                 const obsBox = new THREE.Box3();
                 if (obs.components.MeshComponent && obs.components.MeshComponent.mesh.geometry.boundingBox) {
-                     const mesh = obs.components.MeshComponent.mesh;
-                     obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
+                    const mesh = obs.components.MeshComponent.mesh;
+                    obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
                 } else {
                     const min = new THREE.Vector3(obsTransform.position.x - obsCollider.radius, 0, obsTransform.position.z - obsCollider.radius);
                     const max = new THREE.Vector3(obsTransform.position.x + obsCollider.radius, 2, obsTransform.position.z + obsCollider.radius);

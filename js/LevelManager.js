@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import * as THREE from 'three';
 import { Transform, MeshComponent, PlayerTag, ZombieTag, ObstacleTag, CollectibleTag, DoorTag, Health, Movement, AI, Collider, Weapon, Inventory } from './components.js';
 
 export class LevelManager {
