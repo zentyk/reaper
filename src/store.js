@@ -5,7 +5,10 @@ export const store = reactive({
     isStartScreenVisible: true,
     isGameOverVisible: false,
     isInventoryVisible: false,
-    isPickupPromptVisible: false,
+
+    // Inventory
+    isPickupMode: false,
+    pickupItemName: '',
 
     // HUD
     healthPercent: 100,
@@ -28,10 +31,5 @@ export const store = reactive({
         x: 0,
         y: 0,
         options: []
-    },
-
-    // Pickup
-    pickupPrompt: {
-        text: ''
     }
 })
