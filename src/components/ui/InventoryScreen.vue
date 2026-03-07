@@ -65,6 +65,7 @@
               <div v-if="item" class="slot-content">
                 <div class="slot-name">{{ item.name }}</div>
                 <div v-if="item.count !== undefined" class="slot-count">{{ item.count }}</div>
+                <div v-else-if="item.type === 'weapon'" class="slot-count">{{ item.ammo != null ? item.ammo : '∞' }}</div>
               </div>
             </div>
           </div>
@@ -72,9 +73,9 @@
           <!-- Equipped Weapon / Status Block -->
           <div class="retro-status-block">
              <div class="status-header">Weapon</div>
-             <div class="status-content" v-if="equippedWeapon">
+             <div v-if="equippedWeapon" class="status-content">
                 {{ equippedWeapon.name }}
-                <div class="status-ammo">{{ equippedWeapon.ammo || '∞' }}</div>
+                <div class="status-ammo">{{ equippedWeapon.ammo != null ? equippedWeapon.ammo : '∞' }}</div>
              </div>
           </div>
         </div>

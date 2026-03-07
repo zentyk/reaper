@@ -98,7 +98,8 @@ export class UIManager {
     }
 
     renderInventory(inventory, combineSourceIndex, onSlotClick) {
-        store.inventory = inventory;
+        // Deep clone items and splice them into the array to guarantee Vue reactivity triggers
+        store.inventory.splice(0, store.inventory.length, ...inventory.map(item => item ? { ...item } : null));
         store.combineSourceIndex = combineSourceIndex;
 
         // Unbind previous event listener to avoid stacking

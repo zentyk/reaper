@@ -94,6 +94,14 @@ export class Player {
     }
 
     renderInventory() {
+        // Sync ECS ammo data into the raw UI weapon object
+        const weaponItem = this.inventory.find(i => i && i.type === 'weapon');
+        const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
+
+        if (weaponItem && playerEntity && playerEntity.components.Weapon) {
+            weaponItem.ammo = playerEntity.components.Weapon.ammo;
+        }
+
         this.game.ui.renderInventory(
             this.inventory,
             this.combineSourceIndex,
