@@ -2,22 +2,42 @@ import { Transform, Movement, PlayerTag, Collider, ObstacleTag, InputState, Grap
 import * as THREE from 'three';
 
 export class MovementSystem {
+    constructor() {
+        // GC Optimizations: Pre-allocate vectors and boxes
+        this._tempPos = new THREE.Vector3();
+        this._tempPlayerBox = new THREE.Box3();
+        this._tempObsBox = new THREE.Box3();
+        this._tempMin = new THREE.Vector3();
+        this._tempMax = new THREE.Vector3();
+    }
+
     update(entities, dt) {
-        const obstacles = entities.filter(e => e.components.ObstacleTag);
+        // Initialize character controller if it doesn't exist
+        if (!this.game) {
+            // Find game instance (dirty hack but works for this architecture)
+            this.game = window.game;
+        }
+
+        if (this.game && this.game.physicsWorld && !this.characterController) {
+            this.characterController = this.game.physicsWorld.createCharacterController(0.01);
+            this.characterController.enableAutostep(0.1, 0.1, false);
+            this.characterController.enableSnapToGround(0.1);
+        }
 
         for (const entity of entities) {
             if (entity.components.PlayerTag && entity.components.Transform && entity.components.Movement && entity.components.InputState) {
-                this.handlePlayerMovement(entity, obstacles);
+                this.handlePlayerMovement(entity);
             }
         }
     }
 
-    handlePlayerMovement(entity, obstacles) {
+    handlePlayerMovement(entity) {
         const transform = entity.components.Transform;
         const movement = entity.components.Movement;
         const input = entity.components.InputState;
         const meshComp = entity.components.MeshComponent;
         const grapple = entity.components.Grapple;
+        const rigidBody = entity.rigidBody;
 
         // Don't move if aiming OR grappled
         if (input.aim) return;
@@ -42,21 +62,32 @@ export class MovementSystem {
             dz += Math.cos(transform.rotation.y) * speed;
         }
 
-        // Collision Check
-        if (dx !== 0 || dz !== 0) {
-            // Check X axis
-            let nextPos = transform.position.clone();
-            nextPos.x += dx;
-            if (!this.checkCollision(nextPos, entity, obstacles)) {
-                transform.position.x += dx;
-            }
+        if (this.characterController && rigidBody) {
+            // Apply physics movement
+            this._tempPos.set(dx, 0, dz);
 
-            // Check Z axis
-            nextPos = transform.position.clone();
-            nextPos.z += dz;
-            if (!this.checkCollision(nextPos, entity, obstacles)) {
-                transform.position.z += dz;
-            }
+            // Get the first (and only) collider attached to this body
+            const collider = rigidBody.collider(0);
+
+            this.characterController.computeColliderMovement(collider, this._tempPos);
+
+            const computedMovement = this.characterController.computedMovement();
+
+            // Apply translation to Rapier body
+            const currentPos = rigidBody.translation();
+            rigidBody.setNextKinematicTranslation({
+                x: currentPos.x + computedMovement.x,
+                y: currentPos.y + computedMovement.y,
+                z: currentPos.z + computedMovement.z
+            });
+
+            // Sync visual transform from Rapier back to ThreeJS
+            const newPos = rigidBody.translation();
+            transform.position.set(newPos.x, newPos.y - 0.9, newPos.z); // -0.9 because rigid body is centered at Y 0.9
+        } else {
+            // Fallback to ghost movement if physics fails
+            transform.position.x += dx;
+            transform.position.z += dz;
         }
 
         // Sync Mesh
@@ -64,37 +95,5 @@ export class MovementSystem {
             meshComp.mesh.position.copy(transform.position);
             meshComp.mesh.rotation.copy(transform.rotation);
         }
-    }
-
-    checkCollision(pos, entity, obstacles) {
-        const collider = entity.components.Collider;
-        if (!collider) return false;
-
-        const playerBox = new THREE.Box3();
-        const min = new THREE.Vector3(pos.x - collider.radius, 0, pos.z - collider.radius);
-        const max = new THREE.Vector3(pos.x + collider.radius, 2, pos.z + collider.radius);
-        playerBox.set(min, max);
-
-        for (const obs of obstacles) {
-            const obsCollider = obs.components.Collider;
-            const obsTransform = obs.components.Transform;
-
-            if (obsCollider && obsTransform) {
-                const obsBox = new THREE.Box3();
-                if (obs.components.MeshComponent && obs.components.MeshComponent.mesh.geometry.boundingBox) {
-                    const mesh = obs.components.MeshComponent.mesh;
-                    obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-                } else {
-                    const min = new THREE.Vector3(obsTransform.position.x - obsCollider.radius, 0, obsTransform.position.z - obsCollider.radius);
-                    const max = new THREE.Vector3(obsTransform.position.x + obsCollider.radius, 2, obsTransform.position.z + obsCollider.radius);
-                    obsBox.set(min, max);
-                }
-
-                if (playerBox.intersectsBox(obsBox)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }

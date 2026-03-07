@@ -4,9 +4,31 @@ import * as THREE from 'three';
 export class AISystem {
     constructor(pathfinder) {
         this.pathfinder = pathfinder;
+
+        // GC Optimizations: Pre-allocate vectors and boxes
+        this._tempLookTarget = new THREE.Vector3();
+        this._tempVectorA = new THREE.Vector3();
+        this._tempVectorB = new THREE.Vector3();
+        this._tempDir = new THREE.Vector3();
+        this._tempPos = new THREE.Vector3();
+
+        this._tempZombieBox = new THREE.Box3();
+        this._tempObsBox = new THREE.Box3();
+        this._tempMin = new THREE.Vector3();
+        this._tempMax = new THREE.Vector3();
     }
 
     update(entities, dt) {
+        if (!this.game) {
+            this.game = window.game;
+        }
+
+        if (this.game && this.game.physicsWorld && !this.characterController) {
+            this.characterController = this.game.physicsWorld.createCharacterController(0.01);
+            this.characterController.enableAutostep(0.1, 0.1, false);
+            this.characterController.enableSnapToGround(0.1);
+        }
+
         const player = entities.find(e => e.components.PlayerTag);
         if (!player) return;
 
@@ -14,20 +36,19 @@ export class AISystem {
         const grapple = player.components.Grapple;
         const isPlayerGrappled = grapple ? grapple.isGrappled : false;
 
-        const obstacles = entities.filter(e => e.components.ObstacleTag);
-
         for (const entity of entities) {
             if (entity.components.ZombieTag && entity.components.AI) {
-                this.updateZombie(entity, playerPos, dt, isPlayerGrappled, obstacles);
+                this.updateZombie(entity, playerPos, dt, isPlayerGrappled);
             }
         }
     }
 
-    updateZombie(entity, targetPos, dt, isPlayerGrappled, obstacles) {
+    updateZombie(entity, targetPos, dt, isPlayerGrappled) {
         const ai = entity.components.AI;
         const transform = entity.components.Transform;
         const movement = entity.components.Movement;
         const meshComp = entity.components.MeshComponent;
+        const rigidBody = entity.rigidBody;
 
         // Handle Knockdown
         if (ai.state === 'knocked_down') {
@@ -36,15 +57,12 @@ export class AISystem {
                 ai.state = 'chase'; // Stand up
 
                 // Reset Transform
-                transform.position.y = 0.9;
                 transform.rotation.x = 0;
 
                 // Reset Mesh
                 if (meshComp && meshComp.mesh) {
                     meshComp.mesh.rotation.x = 0;
-                    meshComp.mesh.position.y = 0.9;
-                    // Ensure color is reset if it wasn't already
-                    if (meshComp.mesh.material.color.getHex() === 0xff00ff) { // If still purple
+                    if (meshComp.mesh.material.color.getHex() === 0xff00ff) {
                         meshComp.mesh.material.color.setHex(0x0000ff);
                     }
                 }
@@ -59,9 +77,9 @@ export class AISystem {
 
         // If another zombie is biting, wait (idle)
         if (isPlayerGrappled) {
-            const lookTarget = new THREE.Vector3(targetPos.x, transform.position.y, targetPos.z);
+            this._tempLookTarget.set(targetPos.x, transform.position.y, targetPos.z);
             if (meshComp && meshComp.mesh) {
-                meshComp.mesh.lookAt(lookTarget);
+                meshComp.mesh.lookAt(this._tempLookTarget);
                 transform.rotation.copy(meshComp.mesh.rotation);
             }
             return;
@@ -78,6 +96,7 @@ export class AISystem {
             if (ai.pathTimer > 0.5) {
                 ai.pathTimer = 0;
                 if (this.pathfinder) {
+                    // Try to generate path
                     ai.path = this.pathfinder.findPath(transform.position, targetPos);
                 }
             }
@@ -87,8 +106,9 @@ export class AISystem {
             // Follow path if available
             if (ai.path && ai.path.length > 0) {
                 const nextPoint = ai.path[0];
-                const dist = new THREE.Vector3(transform.position.x, 0, transform.position.z)
-                    .distanceTo(new THREE.Vector3(nextPoint.x, 0, nextPoint.z));
+                this._tempVectorA.set(transform.position.x, 0, transform.position.z);
+                this._tempVectorB.set(nextPoint.x, 0, nextPoint.z);
+                const dist = this._tempVectorA.distanceTo(this._tempVectorB);
 
                 if (dist < 0.5) {
                     ai.path.shift();
@@ -101,33 +121,44 @@ export class AISystem {
             }
 
             // Move towards target
-            const dir = new THREE.Vector3().subVectors(moveTarget, transform.position);
-            dir.y = 0;
-            dir.normalize();
+            this._tempDir.subVectors(moveTarget, transform.position);
+            this._tempDir.y = 0;
+            this._tempDir.normalize();
 
             // Axis-independent movement for sliding
-            const dx = dir.x * movement.speed;
-            const dz = dir.z * movement.speed;
+            const dx = this._tempDir.x * movement.speed;
+            const dz = this._tempDir.z * movement.speed;
 
-            // Try moving X
-            let nextPos = transform.position.clone();
-            nextPos.x += dx;
-            if (!this.checkCollision(nextPos, entity, obstacles)) {
+            if (this.characterController && rigidBody) {
+                this._tempPos.set(dx, 0, dz);
+                const collider = rigidBody.collider(0);
+
+                if (collider) {
+                    this.characterController.computeColliderMovement(collider, this._tempPos);
+                    const computedMovement = this.characterController.computedMovement();
+
+                    const currentPos = rigidBody.translation();
+                    rigidBody.setNextKinematicTranslation({
+                        x: currentPos.x + computedMovement.x,
+                        y: currentPos.y + computedMovement.y,
+                        z: currentPos.z + computedMovement.z
+                    });
+
+                    // Sync visual transform
+                    const newPos = rigidBody.translation();
+                    transform.position.set(newPos.x, newPos.y, newPos.z);
+                }
+            } else {
+                // Fallback
                 transform.position.x += dx;
-            }
-
-            // Try moving Z
-            nextPos = transform.position.clone();
-            nextPos.z += dz;
-            if (!this.checkCollision(nextPos, entity, obstacles)) {
                 transform.position.z += dz;
             }
 
             // Look at
-            if (dir.lengthSq() > 0) {
-                const lookTarget = new THREE.Vector3(moveTarget.x, transform.position.y, moveTarget.z);
+            if (this._tempDir.lengthSq() > 0) {
+                this._tempLookTarget.set(moveTarget.x, transform.position.y, moveTarget.z);
                 if (meshComp && meshComp.mesh) {
-                    meshComp.mesh.lookAt(lookTarget);
+                    meshComp.mesh.lookAt(this._tempLookTarget);
                     transform.rotation.copy(meshComp.mesh.rotation);
                 }
             }
@@ -137,37 +168,5 @@ export class AISystem {
         if (meshComp && meshComp.mesh) {
             meshComp.mesh.position.copy(transform.position);
         }
-    }
-
-    checkCollision(pos, entity, obstacles) {
-        const collider = entity.components.Collider;
-        if (!collider) return false;
-
-        const zombieBox = new THREE.Box3();
-        const min = new THREE.Vector3(pos.x - collider.radius, 0, pos.z - collider.radius);
-        const max = new THREE.Vector3(pos.x + collider.radius, 2, pos.z + collider.radius);
-        zombieBox.set(min, max);
-
-        for (const obs of obstacles) {
-            const obsCollider = obs.components.Collider;
-            const obsTransform = obs.components.Transform;
-
-            if (obsCollider && obsTransform) {
-                const obsBox = new THREE.Box3();
-                if (obs.components.MeshComponent && obs.components.MeshComponent.mesh.geometry.boundingBox) {
-                    const mesh = obs.components.MeshComponent.mesh;
-                    obsBox.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
-                } else {
-                    const min = new THREE.Vector3(obsTransform.position.x - obsCollider.radius, 0, obsTransform.position.z - obsCollider.radius);
-                    const max = new THREE.Vector3(obsTransform.position.x + obsCollider.radius, 2, obsTransform.position.z + obsCollider.radius);
-                    obsBox.set(min, max);
-                }
-
-                if (zombieBox.intersectsBox(obsBox)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }

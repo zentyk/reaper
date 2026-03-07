@@ -5,6 +5,21 @@ export class CombatSystem {
     constructor(game) {
         this.game = game;
         this.raycaster = new THREE.Raycaster();
+
+        // GC Optimizations: Pre-allocate vectors
+        this._tempDir = new THREE.Vector3();
+        this._tempOrigin = new THREE.Vector3();
+        this._tempEndPoint = new THREE.Vector3();
+        this._tempPushDir = new THREE.Vector3();
+
+        // Object Pooling: Pre-allocate the bullet tracer line 
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(6); // 2 vertices x 3 axes
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const material = new THREE.LineBasicMaterial({ color: 0xffff00 });
+        this.tracerLine = new THREE.Line(geometry, material);
+        this.tracerLine.visible = false;
+        this.game.scene.add(this.tracerLine);
     }
 
     update(entities, dt) {
@@ -58,8 +73,8 @@ export class CombatSystem {
 
                 const gTransform = grappler.components.Transform;
                 const pTransform = player.components.Transform;
-                const pushDir = new THREE.Vector3().subVectors(gTransform.position, pTransform.position).normalize();
-                gTransform.position.add(pushDir.multiplyScalar(1.5));
+                this._tempPushDir.subVectors(gTransform.position, pTransform.position).normalize();
+                gTransform.position.add(this._tempPushDir.multiplyScalar(1.5));
 
                 if (grappler.components.MeshComponent) {
                     this.flashEntity(grappler, 0x0000ff); // Reset color
@@ -195,24 +210,30 @@ export class CombatSystem {
         console.log("Bang!");
         const transform = player.components.Transform;
 
-        const direction = new THREE.Vector3(0, 0, -1);
-        direction.applyEuler(transform.rotation);
+        this._tempDir.set(0, 0, -1);
+        this._tempDir.applyEuler(transform.rotation);
 
-        const origin = transform.position.clone();
-        origin.y += 1.4;
+        this._tempOrigin.copy(transform.position);
+        this._tempOrigin.y += 1.4;
 
-        this.raycaster.set(origin, direction);
+        this.raycaster.set(this._tempOrigin, this._tempDir);
 
-        const endPoint = origin.clone().add(direction.multiplyScalar(100));
-        const points = [origin, endPoint];
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({ color: 0xffff00 });
-        const line = new THREE.Line(geometry, material);
-        this.game.scene.add(line);
-        setTimeout(() => {
-            this.game.scene.remove(line);
-            geometry.dispose();
-            material.dispose();
+        this._tempEndPoint.copy(this._tempOrigin).add(this._tempDir.multiplyScalar(100));
+
+        // Use object pooled line instead of new allocations
+        const positions = this.tracerLine.geometry.attributes.position.array;
+        positions[0] = this._tempOrigin.x;
+        positions[1] = this._tempOrigin.y;
+        positions[2] = this._tempOrigin.z;
+        positions[3] = this._tempEndPoint.x;
+        positions[4] = this._tempEndPoint.y;
+        positions[5] = this._tempEndPoint.z;
+        this.tracerLine.geometry.attributes.position.needsUpdate = true;
+        this.tracerLine.visible = true;
+
+        if (this.tracerTimeout) clearTimeout(this.tracerTimeout);
+        this.tracerTimeout = setTimeout(() => {
+            this.tracerLine.visible = false;
         }, 50);
 
         const zombies = entities.filter(e => e.components.ZombieTag && e.components.MeshComponent);

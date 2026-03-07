@@ -32,8 +32,8 @@ import PickupPrompt from './components/ui/PickupPrompt.vue'
 // Import the legacy vanilla Game entrypoint
 import { Game } from '../js/Game.js'
 
-onMounted(() => {
+onMounted(async () => {
     // Keep window.game for global debug access
-    window.game = new Game();
+    window.game = await Game.init();
 })
 </script>

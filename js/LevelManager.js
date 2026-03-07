@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import RAPIER from '@dimforge/rapier3d-compat';
 import { Transform, MeshComponent, PlayerTag, ZombieTag, ObstacleTag, CollectibleTag, DoorTag, Health, Movement, AI, Collider, Weapon, Inventory } from './components.js';
 
 export class LevelManager {
@@ -78,10 +79,16 @@ export class LevelManager {
     setupCommonEnvironment() {
         // Floor
         const floor = new THREE.Mesh(
-            new THREE.BoxGeometry(20, 0.1, 20),
+            new THREE.BoxGeometry(100, 0.1, 100),
             new THREE.MeshStandardMaterial({ color: 0x333333 })
         );
         this.game.scene.add(floor);
+
+        // --- Physics Floor ---
+        const floorBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.05, 0);
+        const floorBody = this.game.physicsWorld.createRigidBody(floorBodyDesc);
+        const floorColliderDesc = RAPIER.ColliderDesc.cuboid(50, 0.05, 50);
+        this.game.physicsWorld.createCollider(floorColliderDesc, floorBody);
 
         // Lights
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -206,16 +213,25 @@ export class LevelManager {
         // Store gun ref on container for easy access if needed (optional)
         container.userData.gun = gun;
 
+        // --- Physics Body ---
+        const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 0.9, z);
+        const rigidBody = this.game.physicsWorld.createRigidBody(rigidBodyDesc);
+        // Player is a 1.8m tall capsule (0.9 half-height), 0.3m radius
+        const colliderDesc = RAPIER.ColliderDesc.capsule(0.6, 0.25);
+        this.game.physicsWorld.createCollider(colliderDesc, rigidBody);
+
         const entity = this.createEntity([
             new Transform(x, 0, z), // Transform matches container
             new MeshComponent(container),
             new PlayerTag(),
             new Health(100, 100),
-            new Movement(0.08, 0.04),
+            new Movement(0.08, 0.04), // Movement speed
             new Collider(0.3),
             new Inventory(),
             new Weapon(15, 15)
         ]);
+
+        entity.rigidBody = rigidBody;
 
         // Link player to game for legacy access
         this.game.playerEntity = entity;
@@ -235,7 +251,13 @@ export class LevelManager {
         const material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
         const mesh = new THREE.Mesh(geometry, material);
 
-        this.createEntity([
+        // --- Physics Body ---
+        const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 0.9, z);
+        const rigidBody = this.game.physicsWorld.createRigidBody(rigidBodyDesc);
+        const colliderDesc = RAPIER.ColliderDesc.capsule(0.6, 0.25);
+        this.game.physicsWorld.createCollider(colliderDesc, rigidBody);
+
+        const entity = this.createEntity([
             new Transform(x, 0.9, z),
             new MeshComponent(mesh),
             new ZombieTag(),
@@ -244,6 +266,8 @@ export class LevelManager {
             new AI(),
             new Collider(0.3)
         ], id);
+
+        entity.rigidBody = rigidBody;
     }
 
     createObstacle(id, x, z, w, h) {
@@ -252,12 +276,21 @@ export class LevelManager {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(x, 1, z);
 
-        this.createEntity([
+        // --- Physics Body ---
+        const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, 1, z);
+        const rigidBody = this.game.physicsWorld.createRigidBody(rigidBodyDesc);
+        // Cuboid takes half-extents (width/2, height/2, depth/2)
+        const colliderDesc = RAPIER.ColliderDesc.cuboid(w / 2, 1, h / 2);
+        this.game.physicsWorld.createCollider(colliderDesc, rigidBody);
+
+        const entity = this.createEntity([
             new Transform(x, 1, z),
             new MeshComponent(mesh),
             new ObstacleTag(),
             new Collider(Math.max(w, h) / 2)
         ], id);
+
+        entity.rigidBody = rigidBody;
     }
 
     createCollectible(id, type, amount, name, x, y, z) {

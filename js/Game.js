@@ -11,8 +11,14 @@ import { LevelManager } from './LevelManager.js';
 import { Input } from './core/Input.js';
 import { AudioHandler } from './AudioHandler.js';
 import { Player } from './Player.js';
+import RAPIER from '@dimforge/rapier3d-compat';
 
 export class Game {
+    static async init() {
+        await RAPIER.init();
+        return new Game();
+    }
+
     constructor() {
         // --- Core Systems ---
         this.scene = new THREE.Scene();
@@ -22,6 +28,10 @@ export class Game {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setClearColor(0x000000, 1);
         document.body.appendChild(this.renderer.domElement);
+
+        // --- Physics ---
+        const gravity = { x: 0.0, y: -9.81, z: 0.0 };
+        this.physicsWorld = new RAPIER.World(gravity);
 
         // --- Cameras ---
         this.cameras = {
@@ -233,6 +243,7 @@ export class Game {
         this.lastTime = time;
 
         if (!this.isPaused) {
+            this.physicsWorld.step(); // Step physics engine
             this.world.update(dt);
 
             // Check again in case a system (like CombatSystem triggering a cutscene) paused the game

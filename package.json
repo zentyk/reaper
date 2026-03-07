@@ -9,6 +9,7 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@dimforge/rapier3d-compat": "^0.19.3",
         "@primevue/themes": "^4.5.4",
         "primevue": "^4.5.4",
         "three": "^0.160.0",
