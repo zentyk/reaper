@@ -118,6 +118,17 @@ export class Game {
         }
     }
 
+    gameOver() {
+        if (this.isGameOver) return;
+        this.isGameOver = true;
+        this.isPaused = true;
+        this.ui.showGameOver();
+
+        setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+    }
+
     playKeyCutscene() {
         if (this.gameState.cutscenePlayed) return;
         this.gameState.cutscenePlayed = true;

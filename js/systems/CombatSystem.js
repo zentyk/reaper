@@ -48,19 +48,19 @@ export class CombatSystem {
             grapple.isGrappled = false;
             grapple.struggleCount = 0;
             grapple.damageTimer = 0;
-            
+
             if (grappler) {
                 const ai = grappler.components.AI;
                 if (ai) {
                     ai.state = 'knocked_down';
                     ai.knockDownTimer = 5.0;
                 }
-                
+
                 const gTransform = grappler.components.Transform;
                 const pTransform = player.components.Transform;
                 const pushDir = new THREE.Vector3().subVectors(gTransform.position, pTransform.position).normalize();
                 gTransform.position.add(pushDir.multiplyScalar(1.5));
-                
+
                 if (grappler.components.MeshComponent) {
                     this.flashEntity(grappler, 0x0000ff); // Reset color
                     grappler.components.MeshComponent.mesh.rotation.x = -Math.PI / 2;
@@ -76,7 +76,7 @@ export class CombatSystem {
         const input = player.components.InputState;
         const meshComp = player.components.MeshComponent;
 
-        if (!weapon || !input || !meshComp) return;
+        if (!weapon || !weapon.isEquipped || !input || !meshComp) return;
 
         // Cooldowns
         if (weapon.cooldown > 0) weapon.cooldown -= dt;
@@ -109,82 +109,82 @@ export class CombatSystem {
                 this.shoot(player, entities);
                 weapon.ammo--;
                 weapon.cooldown = weapon.fireRate;
-                
+
                 this.updateAmmoUI(weapon);
             } else {
                 console.log("Click! Empty.");
             }
         }
     }
-    
+
     updateAmmoUI(weapon) {
         let totalAmmo = 0;
-        
+
         if (this.game.player && this.game.player.inventory) {
-             const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
-             if (ammoItem) {
-                 totalAmmo = ammoItem.count;
-             } else {
-                 // console.warn("Ammo item not found in inventory!");
-             }
+            const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
+            if (ammoItem) {
+                totalAmmo = ammoItem.count;
+            } else {
+                // console.warn("Ammo item not found in inventory!");
+            }
         } else {
             console.warn("Player or inventory not found!");
         }
         this.game.ui.updateAmmo(weapon.ammo, totalAmmo);
     }
-    
+
     startReload(player) {
         const weapon = player.components.Weapon;
-        
+
         // Check if we have ammo
         let totalAmmo = 0;
         if (this.game.player && this.game.player.inventory) {
-             const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
-             if (ammoItem) totalAmmo = ammoItem.count;
+            const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
+            if (ammoItem) totalAmmo = ammoItem.count;
         }
-        
+
         if (totalAmmo <= 0) {
             this.game.ui.showFeedback("No ammo.");
             return;
         }
-        
+
         console.log("Reloading...");
         weapon.reloadTimer = 1.5; // 1.5s reload
         this.game.ui.showFeedback("Reloading...");
-        
+
         // Visuals
         if (player.components.MeshComponent && player.components.MeshComponent.gun) {
             player.components.MeshComponent.gun.material.color.setHex(0x888888);
         }
     }
-    
+
     finishReload(player) {
         const weapon = player.components.Weapon;
-        
+
         // Calculate ammo
         let ammoItem = null;
         if (this.game.player && this.game.player.inventory) {
-             const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
+            const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
         }
-        
+
         // Re-fetch to be safe
         if (this.game.player && this.game.player.inventory) {
-             ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
+            ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
         }
-        
+
         if (ammoItem) {
             const needed = weapon.maxAmmo - weapon.ammo;
             const toLoad = Math.min(needed, ammoItem.count);
-            
+
             weapon.ammo += toLoad;
             ammoItem.count -= toLoad;
-            
+
             this.updateAmmoUI(weapon);
         }
-        
+
         console.log("Reloaded!");
         this.game.ui.showFeedback("Reloaded!");
-        
+
         // Reset Visuals
         if (player.components.MeshComponent && player.components.MeshComponent.gun) {
             player.components.MeshComponent.gun.material.color.setHex(0x333333);
@@ -194,12 +194,12 @@ export class CombatSystem {
     shoot(player, entities) {
         console.log("Bang!");
         const transform = player.components.Transform;
-        
+
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyEuler(transform.rotation);
 
         const origin = transform.position.clone();
-        origin.y += 1.4; 
+        origin.y += 1.4;
 
         this.raycaster.set(origin, direction);
 
@@ -222,7 +222,7 @@ export class CombatSystem {
         if (intersects.length > 0) {
             const hitObject = intersects[0].object;
             const hitEntity = zombies.find(e => e.components.MeshComponent.mesh === hitObject);
-            
+
             if (hitEntity && hitEntity.components.Health) {
                 console.log("Hit Zombie!");
                 this.damageEntity(hitEntity, 1);
@@ -233,31 +233,33 @@ export class CombatSystem {
     damageEntity(entity, amount) {
         const health = entity.components.Health;
         health.current -= amount;
-        
+
         // Visual feedback
         this.flashEntity(entity, 0xff0000);
 
-        if (health.current <= 0) {
-            this.killEntity(entity);
-        } else if (entity.components.PlayerTag) {
-            this.game.ui.updateHealth(health.current, health.max);
+        if (entity.components.PlayerTag) {
+            this.game.ui.updateHealth(Math.max(0, health.current), health.max);
             if (health.current <= 0) {
-                this.game.gameOver();
+                if (this.game.gameOver) this.game.gameOver();
+            }
+        } else {
+            if (health.current <= 0) {
+                this.killEntity(entity);
             }
         }
     }
-    
+
     flashEntity(entity, colorHex) {
         if (entity.components.MeshComponent) {
             const mesh = entity.components.MeshComponent.mesh;
-            
+
             const setColor = (material) => {
                 if (material && material.color) {
                     if (!material.userData.originalColor) {
                         material.userData.originalColor = material.color.getHex();
                     }
                     material.color.setHex(colorHex);
-                    
+
                     setTimeout(() => {
                         if (material) {
                             material.color.setHex(material.userData.originalColor);
@@ -283,11 +285,11 @@ export class CombatSystem {
         if (entity.components.MeshComponent) {
             this.game.scene.remove(entity.components.MeshComponent.mesh);
         }
-        entity.isDestroyed = true; 
-        
+        entity.isDestroyed = true;
+
         if (entity.components.ZombieTag) {
             if (entity.components.MeshComponent && entity.components.MeshComponent.mesh.userData.id) {
-                 this.game.zombieKilled(entity.components.MeshComponent.mesh.userData.id);
+                this.game.zombieKilled(entity.components.MeshComponent.mesh.userData.id);
             }
         }
     }
@@ -295,14 +297,14 @@ export class CombatSystem {
     handleZombieAttacks(player, entities, dt) {
         const pTransform = player.components.Transform;
         const grapple = player.components.Grapple;
-        
+
         if (!grapple) return;
 
         for (const entity of entities) {
             if (entity.components.ZombieTag && !entity.isDestroyed) {
                 const zTransform = entity.components.Transform;
                 const ai = entity.components.AI;
-                
+
                 if (ai.state === 'knocked_down' || ai.state === 'dead') continue;
 
                 if (zTransform.position.distanceTo(pTransform.position) < 1.0) {
@@ -311,15 +313,15 @@ export class CombatSystem {
                     grapple.grappler = entity;
                     grapple.struggleCount = 0;
                     grapple.damageTimer = 0;
-                    
+
                     ai.state = 'biting';
-                    
+
                     // Visuals
                     if (entity.components.MeshComponent) {
                         const mesh = entity.components.MeshComponent.mesh;
                         if (mesh.material) mesh.material.color.setHex(0xff00ff);
                     }
-                    
+
                     this.damageEntity(player, 10);
                     return;
                 }

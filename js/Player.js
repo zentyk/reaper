@@ -6,56 +6,50 @@ export class Player {
         this.scene = scene;
         this.game = game;
         this.input = new Input();
-        
+
         // Inventory Logic
         this.isInventoryOpen = false;
         this.combineSourceIndex = null;
         this.lastIState = false;
-        
+
         this.inventory = [
             { id: 'handgun', name: 'Handgun', type: 'weapon', equipped: true, combinable: true, usable: false },
             { id: 'ammo', name: 'Ammo', type: 'ammo', count: 30, combinable: true, usable: false },
             null, null, null, null
         ];
-        
+
         // Pickup Logic
         this.pendingCollectible = null;
         this.isPickupPromptOpen = false;
-        
+
         this.setupCheatUI();
         this.setupPickupUI();
     }
 
     setupCheatUI() {
-        const cheatBtn = document.getElementById('cheatBtn');
-        if (cheatBtn) {
-            cheatBtn.addEventListener('click', () => {
-                // Toggle cheat on ECS entity
-                const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
-                if (playerEntity && playerEntity.components.Health) {
-                    playerEntity.components.Health.current = 100;
-                    this.game.ui.updateHealth(100, 100);
-                }
-            });
-        }
+        document.addEventListener('cheat-toggle', () => {
+            // Toggle cheat on ECS entity
+            const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
+            if (playerEntity && playerEntity.components.Health) {
+                playerEntity.components.Health.current = 100;
+                this.game.ui.updateHealth(100, 100);
+            }
+        });
     }
-    
+
     setupPickupUI() {
-        const yesBtn = document.getElementById('pickupYes');
-        const noBtn = document.getElementById('pickupNo');
-        
-        if (yesBtn) {
-            yesBtn.addEventListener('click', () => {
+        document.addEventListener('pickup-yes', () => {
+            if (this.isPickupPromptOpen) {
                 this.collectItem();
                 this.closePickupPrompt();
-            });
-        }
-        
-        if (noBtn) {
-            noBtn.addEventListener('click', () => {
+            }
+        });
+
+        document.addEventListener('pickup-no', () => {
+            if (this.isPickupPromptOpen) {
                 this.closePickupPrompt();
-            });
-        }
+            }
+        });
     }
 
     update() {
@@ -66,23 +60,23 @@ export class Player {
             this.toggleInventory();
         }
         this.lastIState = isIDown;
-        
+
         // Sync UI with ECS data
         const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
         if (playerEntity) {
             const health = playerEntity.components.Health;
-            
+
             if (health) {
                 this.game.ui.updateHealth(health.current, health.max);
             }
         }
     }
-    
+
     toggleInventory() {
         this.isInventoryOpen = !this.isInventoryOpen;
         this.game.isPaused = this.isInventoryOpen;
         this.game.ui.toggleInventory(this.isInventoryOpen);
-        
+
         if (this.isInventoryOpen) {
             this.combineSourceIndex = null;
             this.renderInventory();
@@ -91,8 +85,8 @@ export class Player {
 
     renderInventory() {
         this.game.ui.renderInventory(
-            this.inventory, 
-            this.combineSourceIndex, 
+            this.inventory,
+            this.combineSourceIndex,
             (index, x, y) => this.handleInventoryClick(index, x, y)
         );
     }
@@ -103,20 +97,20 @@ export class Player {
         } else if (this.inventory[index]) {
             const item = this.inventory[index];
             const actions = [
-                { 
-                    label: item.equipped ? 'Unequip' : 'Equip/Use', 
+                {
+                    label: item.equipped ? 'Unequip' : 'Equip/Use',
                     action: () => this.useItem(index),
                     enabled: item.usable || item.type === 'weapon'
                 },
-                { 
-                    label: 'Combine', 
+                {
+                    label: 'Combine',
                     action: () => this.combineItem(index),
-                    enabled: item.combinable 
+                    enabled: item.combinable
                 },
-                { 
-                    label: 'Examine', 
+                {
+                    label: 'Examine',
                     action: () => this.examineItem(index),
-                    enabled: true 
+                    enabled: true
                 }
             ];
             this.game.ui.showContextMenu(x, y, actions);
@@ -147,9 +141,9 @@ export class Player {
         // Find currently equipped and unequip
         const current = this.inventory.find(i => i && i.equipped && i.type === 'weapon');
         if (current) current.equipped = false;
-        
+
         item.equipped = true;
-        
+
         // Update ECS Weapon component
         const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
         if (playerEntity && playerEntity.components.Weapon) {
@@ -163,7 +157,7 @@ export class Player {
 
     unequipWeapon(item) {
         item.equipped = false;
-        
+
         // Update ECS Weapon component
         const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
         if (playerEntity && playerEntity.components.Weapon) {
@@ -189,15 +183,15 @@ export class Player {
 
         const source = this.inventory[this.combineSourceIndex];
         const target = this.inventory[targetIndex];
-        
-        if ((source.id === 'handgun' && target.id === 'ammo') || 
+
+        if ((source.id === 'handgun' && target.id === 'ammo') ||
             (source.id === 'ammo' && target.id === 'handgun')) {
             const ammoItem = source.id === 'ammo' ? source : target;
             this.instantReload(ammoItem);
         } else {
             this.game.ui.showFeedback("This action cannot be done");
         }
-        
+
         this.combineSourceIndex = null;
         this.renderInventory();
     }
@@ -205,9 +199,9 @@ export class Player {
     instantReload(ammoItem) {
         const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
         if (!playerEntity || !playerEntity.components.Weapon) return;
-        
+
         const weapon = playerEntity.components.Weapon;
-        
+
         if (weapon.ammo >= weapon.maxAmmo) {
             this.game.ui.showFeedback("Clip is already full.");
             return;
@@ -215,7 +209,7 @@ export class Player {
 
         const needed = weapon.maxAmmo - weapon.ammo;
         const toLoad = Math.min(needed, ammoItem.count);
-        
+
         if (toLoad <= 0) {
             this.game.ui.showFeedback("No ammo remaining.");
             return;
@@ -223,7 +217,7 @@ export class Player {
 
         weapon.ammo += toLoad;
         ammoItem.count -= toLoad;
-        
+
         this.game.ui.showFeedback("Reloaded!");
         this.game.ui.updateAmmo(weapon.ammo, ammoItem.count); // Update UI immediately
     }
@@ -231,7 +225,7 @@ export class Player {
     examineItem(index) {
         this.game.ui.showFeedback(`It's a ${this.inventory[index].name}.`);
     }
-    
+
     // Pickup Logic
     openPickupPrompt(item) {
         this.game.isPaused = true;
@@ -239,29 +233,29 @@ export class Player {
         this.pendingCollectible = item;
         this.game.ui.showPickupPrompt(item.components.CollectibleTag.name);
     }
-    
+
     closePickupPrompt() {
         this.game.isPaused = false;
         this.isPickupPromptOpen = false;
         this.pendingCollectible = null;
         this.game.ui.hidePickupPrompt();
     }
-    
+
     collectItem() {
         if (!this.pendingCollectible) return;
-        
+
         const tag = this.pendingCollectible.components.CollectibleTag;
-        
+
         // Use persistentId if available, otherwise fallback to mesh userData
-        const id = this.pendingCollectible.persistentId || 
-                   (this.pendingCollectible.components.MeshComponent && this.pendingCollectible.components.MeshComponent.mesh.userData.id);
-                   
+        const id = this.pendingCollectible.persistentId ||
+            (this.pendingCollectible.components.MeshComponent && this.pendingCollectible.components.MeshComponent.mesh.userData.id);
+
         if (id) {
             this.game.itemCollected(id);
         } else {
             console.warn("Collected item has no ID, persistence will fail.");
         }
-        
+
         // Add to inventory logic
         if (tag.type === 'ammo') {
             const existing = this.inventory.find(i => i && i.id === 'ammo');
@@ -271,27 +265,27 @@ export class Player {
                 if (empty !== -1) this.inventory[empty] = { id: 'ammo', name: 'Ammo', type: 'ammo', count: tag.amount, combinable: true };
             }
             this.game.ui.showFeedback(`Picked up ${tag.amount} Ammo`);
-            
+
             // Update UI immediately
             const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
             if (playerEntity && playerEntity.components.Weapon) {
-                 const ammoItem = this.inventory.find(i => i && i.id === 'ammo');
-                 this.game.ui.updateAmmo(playerEntity.components.Weapon.ammo, ammoItem ? ammoItem.count : 0);
+                const ammoItem = this.inventory.find(i => i && i.id === 'ammo');
+                this.game.ui.updateAmmo(playerEntity.components.Weapon.ammo, ammoItem ? ammoItem.count : 0);
             }
 
         } else if (tag.type === 'key') {
-             const empty = this.inventory.findIndex(i => i === null);
-             if (empty !== -1) this.inventory[empty] = { id: 'key', name: 'Exit Key', type: 'key', combinable: false };
-             this.game.ui.showFeedback(`Picked up ${tag.name}`);
+            const empty = this.inventory.findIndex(i => i === null);
+            if (empty !== -1) this.inventory[empty] = { id: 'key', name: 'Exit Key', type: 'key', combinable: false };
+            this.game.ui.showFeedback(`Picked up ${tag.name}`);
         } else if (tag.type === 'health') {
-             const empty = this.inventory.findIndex(i => i === null);
-             if (empty !== -1) this.inventory[empty] = { id: 'herb', name: 'Green Herb', type: 'health', amount: tag.amount, combinable: false, usable: true };
-             this.game.ui.showFeedback(`Picked up ${tag.name}`);
+            const empty = this.inventory.findIndex(i => i === null);
+            if (empty !== -1) this.inventory[empty] = { id: 'herb', name: 'Green Herb', type: 'health', amount: tag.amount, combinable: false, usable: true };
+            this.game.ui.showFeedback(`Picked up ${tag.name}`);
         }
-        
+
         // Remove from scene
         if (this.pendingCollectible.components.MeshComponent) {
-             this.game.scene.remove(this.pendingCollectible.components.MeshComponent.mesh);
+            this.game.scene.remove(this.pendingCollectible.components.MeshComponent.mesh);
         }
         this.pendingCollectible.isDestroyed = true;
     }
@@ -300,18 +294,18 @@ export class Player {
     tryOpenDoor(door) {
         // Check if player has the key
         const hasKey = this.inventory.some(item => item && item.id === 'key');
-        
+
         if (hasKey) {
             this.initiateLevelChange(door.components.DoorTag.targetLevel);
         } else {
             this.game.ui.showFeedback("It's locked. You need a key.");
         }
     }
-    
+
     initiateLevelChange(targetLevel) {
         // Fade out and load next level
         this.game.audio.fadeOutMusic();
-        
+
         const fadeOverlay = document.getElementById('fadeOverlay');
         if (fadeOverlay) {
             fadeOverlay.style.opacity = '1';

@@ -4,21 +4,14 @@ export class UIManager {
             start: document.getElementById('startScreen'),
             gameOver: document.getElementById('gameOverScreen'),
             inventory: document.getElementById('inventoryScreen'),
-            uiContainer: document.getElementById('uiContainer'),
+            hud: document.getElementById('hud'),
             pickupPrompt: document.getElementById('pickupPrompt'),
             fadeOverlay: document.getElementById('fadeOverlay'),
             contextMenu: document.getElementById('contextMenu')
         };
 
         this.elements = {
-            healthBar: document.getElementById('healthValue'),
-            ammoValue: document.getElementById('ammoValue'),
-            levelText: document.getElementById('levelText'),
-            pickupText: document.getElementById('pickupText'),
-            invGrid: document.getElementById('invGrid'),
-            cheatBtn: document.getElementById('cheatBtn'),
-            pickupYes: document.getElementById('pickupYes'),
-            pickupNo: document.getElementById('pickupNo')
+            levelText: document.getElementById('levelText')
         };
 
         this.callbacks = {
@@ -32,67 +25,47 @@ export class UIManager {
     }
 
     _bindEvents() {
-        const startBtn = document.getElementById('startButton');
-        if (startBtn) {
-            startBtn.addEventListener('click', () => {
-                if (this.callbacks.onStart) this.callbacks.onStart();
-            });
-        }
+        document.addEventListener('start-game', () => {
+            if (this.callbacks.onStart) this.callbacks.onStart();
+        });
 
-        if (this.elements.cheatBtn) {
-            this.elements.cheatBtn.addEventListener('click', () => {
-                if (this.callbacks.onCheatToggle) this.callbacks.onCheatToggle();
-            });
-        }
+        document.addEventListener('cheat-toggle', () => {
+            if (this.callbacks.onCheatToggle) this.callbacks.onCheatToggle();
+        });
 
-        if (this.elements.pickupYes) {
-            this.elements.pickupYes.addEventListener('click', () => {
-                if (this.callbacks.onPickupYes) this.callbacks.onPickupYes();
-            });
-        }
+        document.addEventListener('pickup-yes', () => {
+            if (this.callbacks.onPickupYes) this.callbacks.onPickupYes();
+        });
 
-        if (this.elements.pickupNo) {
-            this.elements.pickupNo.addEventListener('click', () => {
-                if (this.callbacks.onPickupNo) this.callbacks.onPickupNo();
-            });
-        }
+        document.addEventListener('pickup-no', () => {
+            if (this.callbacks.onPickupNo) this.callbacks.onPickupNo();
+        });
     }
 
     showStartScreen() {
-        // Should not be called after start, but for completeness
-        if (this.screens.start) {
-            this.screens.start.style.display = 'flex';
-        }
-        this.screens.uiContainer.style.display = 'none';
+        // Redundant realistically, but retained for schema completeness
     }
 
     hideStartScreen() {
         console.log("Nuking Start Screen");
-        // Completely remove it from the DOM to ensure it can't block anything
         if (this.screens.start && this.screens.start.parentNode) {
             this.screens.start.parentNode.removeChild(this.screens.start);
-            this.screens.start = null; // Clear reference
+            this.screens.start = null;
         }
-        
-        this.screens.uiContainer.classList.remove('hidden');
-        this.screens.uiContainer.style.display = 'flex';
+
+        if (this.screens.hud) this.screens.hud.show();
     }
 
     showGameOver() {
-        this.screens.gameOver.classList.remove('hidden');
-        this.screens.gameOver.style.display = 'flex';
+        if (this.screens.gameOver) this.screens.gameOver.show();
     }
 
     updateHealth(current, max) {
-        const percent = (current / max) * 100;
-        this.elements.healthBar.style.width = `${percent}%`;
-        if (percent > 50) this.elements.healthBar.style.backgroundColor = 'green';
-        else if (percent > 25) this.elements.healthBar.style.backgroundColor = 'yellow';
-        else this.elements.healthBar.style.backgroundColor = 'red';
+        if (this.screens.hud) this.screens.hud.updateHealth(current, max);
     }
 
     updateAmmo(current, max) {
-        this.elements.ammoValue.innerText = `${current} / ${max}`;
+        if (this.screens.hud) this.screens.hud.updateAmmo(current, max);
     }
 
     updateLevelText(level) {
@@ -113,20 +86,12 @@ export class UIManager {
             if (callback) callback();
         }, 500);
     }
-    
+
     showFeedback(message) {
         const feedback = document.createElement('div');
-        feedback.style.position = 'absolute';
-        feedback.style.bottom = '100px';
-        feedback.style.left = '50%';
-        feedback.style.transform = 'translateX(-50%)';
-        feedback.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-        feedback.style.color = 'white';
-        feedback.style.padding = '20px';
-        feedback.style.borderRadius = '5px';
-        feedback.style.zIndex = '1000';
+        feedback.className = 'feedback-message';
         feedback.innerText = message;
-        
+
         document.body.appendChild(feedback);
         setTimeout(() => {
             if (document.body.contains(feedback)) document.body.removeChild(feedback);
@@ -136,101 +101,43 @@ export class UIManager {
     // Inventory UI methods
     toggleInventory(isOpen) {
         if (isOpen) {
-            this.screens.inventory.classList.remove('hidden');
-            this.screens.inventory.style.display = 'flex';
+            if (this.screens.inventory) this.screens.inventory.show();
         } else {
-            this.screens.inventory.classList.add('hidden');
-            this.screens.inventory.style.display = 'none';
+            if (this.screens.inventory) this.screens.inventory.hide();
             this.hideContextMenu();
         }
     }
 
     renderInventory(inventory, combineSourceIndex, onSlotClick) {
-        this.elements.invGrid.innerHTML = '';
-
-        if (combineSourceIndex !== null) {
-            const instruction = document.createElement('div');
-            instruction.style.position = 'absolute';
-            instruction.style.top = '80px';
-            instruction.style.color = '#ff00ff';
-            instruction.innerText = "Select item to combine with...";
-            this.elements.invGrid.appendChild(instruction);
+        // Unbind previous event listener to avoid stacking
+        if (this._inventorySlotClickListener) {
+            document.removeEventListener('slot-click', this._inventorySlotClickListener);
         }
 
-        inventory.forEach((item, index) => {
-            const slot = document.createElement('div');
-            slot.className = 'inv-slot';
-            
-            if (combineSourceIndex === index) {
-                slot.style.borderColor = '#ff00ff';
-                slot.style.boxShadow = '0 0 10px #ff00ff';
-            }
+        this._inventorySlotClickListener = (e) => {
+            onSlotClick(e.detail.index, e.detail.x, e.detail.y);
+        };
 
-            if (item) {
-                slot.classList.add('item');
-                if (item.equipped) slot.classList.add('equipped');
-                
-                let text = item.name;
-                if (item.type === 'weapon' && item.equipped) {
-                    // Assuming we can get ammo info from item or passed in. 
-                    // For now just name.
-                }
-                if (item.count !== undefined) text += `<br>x${item.count}`;
-                if (item.equipped) text += `<br>(Equipped)`;
-                
-                slot.innerHTML = text;
-                
-                slot.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    onSlotClick(index, e.clientX, e.clientY);
-                });
-            } else {
-                slot.addEventListener('click', (e) => {
-                    onSlotClick(index, null, null);
-                });
-            }
-            this.elements.invGrid.appendChild(slot);
-        });
+        document.addEventListener('slot-click', this._inventorySlotClickListener);
+
+        if (this.screens.inventory) {
+            this.screens.inventory.renderItems(inventory, combineSourceIndex);
+        }
     }
 
     showContextMenu(x, y, actions) {
-        this.screens.contextMenu.innerHTML = '';
-        this.screens.contextMenu.classList.remove('hidden');
-        this.screens.contextMenu.style.display = 'flex';
-        this.screens.contextMenu.style.left = `${x}px`;
-        this.screens.contextMenu.style.top = `${y}px`;
-
-        actions.forEach(opt => {
-            const div = document.createElement('div');
-            div.className = 'context-option';
-            div.innerText = opt.label;
-            
-            if (opt.enabled) {
-                div.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    opt.action();
-                    this.hideContextMenu();
-                });
-            } else {
-                div.classList.add('disabled');
-            }
-            this.screens.contextMenu.appendChild(div);
-        });
+        if (this.screens.contextMenu) this.screens.contextMenu.show(x, y, actions);
     }
 
     hideContextMenu() {
-        this.screens.contextMenu.classList.add('hidden');
-        this.screens.contextMenu.style.display = 'none';
+        if (this.screens.contextMenu) this.screens.contextMenu.hide();
     }
 
     showPickupPrompt(itemName) {
-        this.elements.pickupText.innerText = `Will you take the ${itemName}?`;
-        this.screens.pickupPrompt.classList.remove('hidden');
-        this.screens.pickupPrompt.style.display = 'flex';
+        if (this.screens.pickupPrompt) this.screens.pickupPrompt.show(itemName);
     }
 
     hidePickupPrompt() {
-        this.screens.pickupPrompt.classList.add('hidden');
-        this.screens.pickupPrompt.style.display = 'none';
+        if (this.screens.pickupPrompt) this.screens.pickupPrompt.hide();
     }
 }
