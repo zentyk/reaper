@@ -39,9 +39,11 @@ export class MovementSystem {
         const grapple = entity.components.Grapple;
         const rigidBody = entity.rigidBody;
 
-        // Don't move if aiming OR grappled
+        // Don't move if aiming, grappled, or reloading
         if (input.aim) return;
         if (grapple && grapple.isGrappled) return;
+        const weapon = entity.components.Weapon;
+        if (weapon && weapon.reloadTimer > 0) return;
 
         // Rotation
         if (input.left) transform.rotation.y += movement.rotationSpeed;

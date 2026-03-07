@@ -199,7 +199,43 @@ export class Player {
             this.knifeBaseRot = knife.rotation.clone();
         }
 
-        const dt = 0.016; // Approx 60fps tick
+        const dt = 0.016;
+
+        // --- Reload Animation (takes priority over everything else) ---
+        const playerEntity = this.entity;
+        const weapon = playerEntity && playerEntity.components.Weapon;
+        const reloadDuration = 1.5;
+        if (weapon && weapon.reloadTimer > 0) {
+            // t goes 0→1 as the reload progresses (timer counts DOWN from 1.5)
+            const t = 1.0 - (weapon.reloadTimer / reloadDuration);
+
+            if (t < 0.3) {
+                // Phase 1: Drop the weapon down to hip and tilt outward (0–30%)
+                const p = t / 0.3;
+                const ease = 1 - Math.pow(1 - p, 2);
+                knife.position.y = this.knifeBasePos.y - ease * 0.55;
+                knife.position.x = this.knifeBasePos.x - ease * 0.12;
+                knife.rotation.x = this.knifeBaseRot.x + ease * 0.8; // tilt muzzle down
+                knife.rotation.z = this.knifeBaseRot.z + ease * 0.5; // swing outward
+            } else if (t < 0.7) {
+                // Phase 2: Hold low — "swap the mag" wobble (30–70%)
+                const p = (t - 0.3) / 0.4;
+                const wobble = Math.sin(p * Math.PI * 3) * 0.08; // small tap animation
+                knife.position.y = this.knifeBasePos.y - 0.55 + wobble;
+                knife.position.x = this.knifeBasePos.x - 0.12;
+                knife.rotation.x = this.knifeBaseRot.x + 0.8;
+                knife.rotation.z = this.knifeBaseRot.z + 0.5 + wobble;
+            } else {
+                // Phase 3: Raise back up to aiming position (70–100%)
+                const p = (t - 0.7) / 0.3;
+                const ease = 1 - Math.pow(1 - p, 3);
+                knife.position.y = (this.knifeBasePos.y - 0.55) + ease * 0.55;
+                knife.position.x = (this.knifeBasePos.x - 0.12) + ease * 0.12;
+                knife.rotation.x = (this.knifeBaseRot.x + 0.8) - ease * 0.8;
+                knife.rotation.z = (this.knifeBaseRot.z + 0.5) - ease * 0.5;
+            }
+            return; // Skip all other animation while reloading
+        }
 
         if (this.knifeStabbing) {
             this.knifeStabTimer += dt;
