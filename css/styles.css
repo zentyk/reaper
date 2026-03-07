@@ -1,30 +1,14 @@
 :root {
-    /* Base Colors */
+    /* Base Colors Retained for HTML Canvas/Overlays */
     --color-bg-body: #000;
     --color-bg-base: #111;
-    --color-bg-panel: #222;
-    --color-bg-button: #333;
-    --color-bg-hover: #444;
-    --color-bg-accent: #555;
 
     /* Text / Core UI */
     --color-text-main: white;
-    --color-text-muted: #aaa;
-    --color-border-main: #555;
-
-    /* Semantic Actions */
-    --color-success: #00ff00;
-    --color-success-bg: #00aa00;
-    --color-warning: yellow;
-    --color-danger: red;
-    --color-danger-dark: #880000;
 
     /* Overlays */
     --color-overlay-dark: rgba(0, 0, 0, 0.85);
     --color-overlay-hud: rgba(0, 0, 0, 0.5);
-
-    /* Specific Highlights */
-    --color-highlight-combine: #ff00ff;
 }
 
 body {
@@ -61,41 +45,20 @@ canvas {
     height: 100%;
     background-color: var(--color-bg-base);
     display: flex;
-    /* Can be toggled to flex via JS/WebComponent attached-styles but default depends on implementation. We define block style here. */
     justify-content: center;
     align-items: center;
     flex-direction: column;
     z-index: 20;
-    transition: opacity 0.5s ease-in;
-}
-
-.start-screen--hidden {
-    display: none;
 }
 
 .start-screen__title {
     color: var(--color-text-main);
     font-size: 4rem;
     margin-bottom: 50px;
-    text-shadow: 0 0 10px var(--color-success);
+    text-shadow: 0 0 10px var(--p-red-500);
 }
 
-.start-screen__button {
-    padding: 20px 40px;
-    font-size: 2rem;
-    background-color: var(--color-bg-button);
-    color: var(--color-text-main);
-    border: 2px solid var(--color-border-main);
-    cursor: pointer;
-    font-family: 'Courier New', Courier, monospace;
-    transition: background-color 0.3s;
-}
-
-.start-screen__button:hover {
-    background-color: var(--color-bg-accent);
-}
-
-/* --- Block: Game Over Screen --- */
+/* --- Block: Game Over Screen (Structural Overrides) --- */
 .game-over-screen {
     position: absolute;
     top: 0;
@@ -126,10 +89,10 @@ canvas {
 }
 
 .game-over-screen__text {
-    color: var(--color-danger-dark);
+    color: var(--p-red-500);
     font-size: 5rem;
     font-weight: bold;
-    text-shadow: 0 0 10px var(--color-danger);
+    text-shadow: 0 0 10px var(--p-red-400);
     opacity: 0;
     transition: opacity 2s ease-in;
 }
@@ -150,13 +113,12 @@ canvas {
     z-index: 10;
 }
 
-/* --- Block: HUD --- */
+/* --- Block: HUD Base Shell --- */
 .hud {
     position: absolute;
     bottom: 20px;
     left: 20px;
     display: none;
-    /* hidden initially */
     flex-direction: column;
     gap: 10px;
     pointer-events: none;
@@ -166,7 +128,6 @@ canvas {
     display: flex;
 }
 
-/* --- Block: HUD Display Element --- */
 .hud-display {
     color: var(--color-text-main);
     font-size: 1.5rem;
@@ -175,225 +136,7 @@ canvas {
     border-radius: 5px;
     display: flex;
     align-items: center;
-}
-
-.hud-display__bar {
-    width: 200px;
-    height: 20px;
-    background-color: var(--color-bg-button);
-    border: 1px solid var(--color-border-main);
-    margin-left: 10px;
-}
-
-.hud-display__value {
-    width: 100%;
-    height: 100%;
-    background-color: green;
-    transition: width 0.5s ease, background-color 0.5s ease;
-}
-
-.hud-display__value--warning {
-    background-color: var(--color-warning);
-}
-
-.hud-display__value--critical {
-    background-color: var(--color-danger);
-}
-
-.hud-display__text {
-    margin-left: 10px;
-    font-weight: bold;
-}
-
-.hud__cheats {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
     pointer-events: auto;
-}
-
-.hud__cheat-btn {
-    pointer-events: auto;
-    background-color: var(--color-bg-button);
-    color: var(--color-text-main);
-    border: 1px solid var(--color-border-main);
-    padding: 5px 10px;
-    border-radius: 5px;
-    cursor: pointer;
-    font-family: 'Courier New', Courier, monospace;
-    font-weight: bold;
-    width: fit-content;
-}
-
-.hud__cheat-btn:hover {
-    background-color: var(--color-bg-accent);
-}
-
-.hud__cheat-btn--active {
-    background-color: var(--color-success-bg);
-    border-color: var(--color-success);
-}
-
-/* --- Block: Inventory Screen --- */
-.inventory-screen {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: var(--color-overlay-dark);
-    display: none;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 5;
-    color: var(--color-text-main);
-}
-
-.inventory-screen--visible {
-    display: flex;
-}
-
-.inventory-screen__title {
-    font-size: 3rem;
-    margin-bottom: 20px;
-    border-bottom: 2px solid var(--color-text-main);
-    padding-bottom: 10px;
-}
-
-/* --- Block: Inventory Grid --- */
-.inventory-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 100px);
-    grid-template-rows: repeat(2, 100px);
-    gap: 10px;
-    position: relative;
-    /* For the "Select item..." instruction div */
-}
-
-/* --- Block: Inventory Slot --- */
-.inventory-slot {
-    width: 100px;
-    height: 100px;
-    border: 2px solid var(--color-border-main);
-    background-color: var(--color-bg-panel);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    font-size: 0.8rem;
-    cursor: pointer;
-    position: relative;
-}
-
-.inventory-slot--item {
-    background-color: var(--color-bg-button);
-}
-
-.inventory-slot--equipped {
-    border-color: var(--color-success);
-    box-shadow: 0 0 10px var(--color-success);
-}
-
-.inventory-slot--combining {
-    border-color: var(--color-highlight-combine);
-    box-shadow: 0 0 10px var(--color-highlight-combine);
-}
-
-.inventory-screen__instruction {
-    position: absolute;
-    top: 80px;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    color: var(--color-highlight-combine);
-}
-
-.inventory-screen__close-hint {
-    margin-top: 20px;
-    font-size: 1.2rem;
-    color: var(--color-text-muted);
-}
-
-/* --- Block: Context Menu --- */
-.context-menu {
-    position: absolute;
-    background-color: var(--color-bg-panel);
-    border: 1px solid var(--color-border-main);
-    display: none;
-    flex-direction: column;
-    z-index: 100;
-    min-width: 120px;
-}
-
-.context-menu--visible {
-    display: flex;
-}
-
-.context-menu__option {
-    padding: 10px;
-    color: var(--color-text-main);
-    cursor: pointer;
-    border-bottom: 1px solid var(--color-bg-hover);
-}
-
-.context-menu__option:hover {
-    background-color: var(--color-bg-hover);
-}
-
-.context-menu__option:last-child {
-    border-bottom: none;
-}
-
-.context-menu__option--disabled {
-    color: #666;
-    cursor: not-allowed;
-}
-
-/* --- Block: Pickup Prompt --- */
-.pickup-prompt {
-    position: absolute;
-    bottom: 100px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: var(--color-text-main);
-    padding: 20px;
-    border: 2px solid var(--color-text-main);
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    z-index: 50;
-    min-width: 300px;
-}
-
-.pickup-prompt--visible {
-    display: flex;
-}
-
-.pickup-prompt__text {
-    font-size: 1.2rem;
-    margin-bottom: 15px;
-    text-align: center;
-}
-
-.pickup-prompt__options {
-    display: flex;
-    gap: 20px;
-}
-
-.pickup-prompt__button {
-    background-color: var(--color-bg-button);
-    color: var(--color-text-main);
-    border: 1px solid var(--color-border-main);
-    padding: 10px 20px;
-    cursor: pointer;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 1rem;
-}
-
-.pickup-prompt__button:hover {
-    background-color: var(--color-bg-accent);
 }
 
 .feedback-message {
@@ -401,9 +144,9 @@ canvas {
     bottom: 100px;
     left: 50%;
     transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    color: var(--color-text-main);
+    background-color: var(--p-surface-900);
+    color: var(--p-text-color);
     padding: 20px;
     border-radius: 5px;
-    z-index: 1000;
+    z-index: 3000;
 }

@@ -1,12 +1,13 @@
 <template>
   <div class="start-screen">
     <h1 class="start-screen__title">REAPER</h1>
-    <button class="start-screen__button" @click="startGame">Start Game</button>
+    <Button label="Start Game" size="large" severity="danger" @click="startGame" />
   </div>
 </template>
 
 <script setup>
 import { store } from '../../store.js'
+import Button from 'primevue/button'
 
 function startGame() {
   // Hide UI via Vue Reactivity

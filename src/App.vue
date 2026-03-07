@@ -6,9 +6,9 @@
     <div id="fadeOverlay" class="fade-overlay"></div>
     <div id="levelText" class="level-text">{{ store.levelText }}</div>
     
-    <InventoryScreen v-show="store.isInventoryVisible" />
-    <ContextMenu v-show="store.contextMenu.visible" />
-    <PickupPrompt v-show="store.isPickupPromptVisible" />
+    <InventoryScreen />
+    <ContextMenu />
+    <PickupPrompt />
     <GameHUD v-show="!store.isStartScreenVisible && !store.isGameOverVisible" />
     
     <div v-show="store.feedbackMessage" class="feedback-message">

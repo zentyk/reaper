@@ -1,29 +1,27 @@
 <template>
-  <div 
-    class="context-menu context-menu--visible"
-    :style="{ left: store.contextMenu.x + 'px', top: store.contextMenu.y + 'px' }"
-  >
-    <div 
-      v-for="(option, index) in store.contextMenu.options" 
-      :key="index"
-      class="context-menu__option"
-      :class="{'context-menu__option--disabled': !option.enabled}"
-      @click="onOptionClick(option)"
-    >
-      {{ option.label }}
-    </div>
-  </div>
+  <Menu 
+    v-if="store.contextMenu.visible"
+    :model="menuItems"
+    class="context-menu--prime"
+    :style="{ position: 'absolute', left: store.contextMenu.x + 'px', top: store.contextMenu.y + 'px', zIndex: 2000 }"
+  />
 </template>
 
 <script setup>
 import { store } from '../../store.js'
+import Menu from 'primevue/menu'
+import { computed } from 'vue'
 
-function onOptionClick(option) {
-  if (option.enabled) {
-    if (typeof option.action === 'function') {
-      option.action();
+const menuItems = computed(() => {
+  return store.contextMenu.options.map(opt => ({
+    label: opt.label,
+    disabled: !opt.enabled,
+    command: () => {
+      if (opt.enabled && typeof opt.action === 'function') {
+        opt.action();
+      }
+      store.contextMenu.visible = false;
     }
-    store.contextMenu.visible = false;
-  }
-}
+  }));
+});
 </script>
