@@ -64,31 +64,46 @@ export class LevelManager {
     }
 
     clearLevel() {
-        // Remove all entities from ECS and Scene
+        // Remove all entities from ECS, Scene, and Physics Engine
         for (const entity of this.game.world.entities) {
             if (entity.components.MeshComponent) {
                 this.game.scene.remove(entity.components.MeshComponent.mesh);
             }
+            if (entity.rigidBody) {
+                this.game.physicsWorld.removeRigidBody(entity.rigidBody);
+            }
         }
         this.game.world.entities = [];
+        this.game.interactables = [];
+        this.game.obstacles = [];
+
+        // Clean up common environment (Floor)
+        if (this.commonFloorMesh) {
+            this.game.scene.remove(this.commonFloorMesh);
+            this.commonFloorMesh = null;
+        }
+        if (this.commonFloorBody) {
+            this.game.physicsWorld.removeRigidBody(this.commonFloorBody);
+            this.commonFloorBody = null;
+        }
 
         // Clear lights
         this.game.scene.children.filter(obj => obj.isLight).forEach(l => this.game.scene.remove(l));
     }
 
     setupCommonEnvironment() {
-        // Floor
-        const floor = new THREE.Mesh(
+        // Floor Mesh
+        this.commonFloorMesh = new THREE.Mesh(
             new THREE.BoxGeometry(100, 0.1, 100),
             new THREE.MeshStandardMaterial({ color: 0x333333 })
         );
-        this.game.scene.add(floor);
+        this.game.scene.add(this.commonFloorMesh);
 
         // --- Physics Floor ---
         const floorBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, -0.05, 0);
-        const floorBody = this.game.physicsWorld.createRigidBody(floorBodyDesc);
+        this.commonFloorBody = this.game.physicsWorld.createRigidBody(floorBodyDesc);
         const floorColliderDesc = RAPIER.ColliderDesc.cuboid(50, 0.05, 50);
-        this.game.physicsWorld.createCollider(floorColliderDesc, floorBody);
+        this.game.physicsWorld.createCollider(floorColliderDesc, this.commonFloorBody);
 
         // Lights
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -153,7 +168,7 @@ export class LevelManager {
         this.createCollectible('key1', 'key', 1, 'Exit Key', 3, 0.1, 2);
         this.createCollectible('herb1', 'health', 50, 'Green Herb', -2, 0.15, -2);
 
-        // Door
+        // Door (id, x, y, z, w, h, d, targetLevel)
         this.createDoor('door1', 0, 1.5, -10, 2, 3, 0.2, 2);
 
         // Zombies
@@ -331,6 +346,13 @@ export class LevelManager {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(x, y, z);
 
+        // --- Physics Body ---
+        const rigidBodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z);
+        const rigidBody = this.game.physicsWorld.createRigidBody(rigidBodyDesc);
+        // Cuboid takes half-extents (width/2, height/2, depth/2)
+        const colliderDesc = RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2);
+        this.game.physicsWorld.createCollider(colliderDesc, rigidBody);
+
         const entity = this.createEntity([
             new Transform(x, y, z),
             new MeshComponent(mesh),
@@ -338,6 +360,8 @@ export class LevelManager {
             new ObstacleTag(),
             new Collider(Math.max(w, d) / 2)
         ], id);
+
+        entity.rigidBody = rigidBody;
 
         this.game.interactables.push(entity);
         this.game.obstacles.push(entity);

@@ -118,8 +118,6 @@ export class UIManager {
     showContextMenu(x, y, actions) {
         store.contextMenu = {
             visible: true,
-            x,
-            y,
             options: actions
         };
     }

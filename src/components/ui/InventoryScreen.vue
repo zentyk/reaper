@@ -15,35 +15,60 @@
       <!-- Split Layout -->
       <div class="retro-split-layout">
         
-        <!-- Left Side: Viewer & Prompts -->
+        <!-- Left Side: Fixed UI Panel -->
         <div class="retro-left-panel">
           
-          <!-- Item 3D Viewer Placeholder -->
-          <div class="retro-viewer-box">
-             <div v-if="activeItem" class="viewer-placeholder">
-               <!-- In a real game, output WebGL render target here -->
-               <div class="spinning-box"></div>
+          <!-- Top Section: Health & Defensive Item -->
+          <div class="retro-top-section">
+             <div class="retro-health-box">
+                <div class="health-ecg-line" :class="healthStatusClass"></div>
+                <div class="health-text" :class="healthStatusClass">{{ healthStatusText }}</div>
              </div>
-             <div v-else class="viewer-empty"></div>
+             
+             <div class="retro-defensive-box">
+                <div class="defensive-header">Defensive Items</div>
+                <div class="defensive-slot">
+                    <div class="spinning-box"></div> <!-- Placeholder for item -->
+                </div>
+             </div>
           </div>
 
-          <!-- Pickup Mode Prompt -->
-          <div v-if="store.isPickupMode" class="retro-prompt-box">
-            <div class="prompt-text">
-              Will you take the<br>
-              <span class="prompt-highlight">{{ store.pickupItemName }}</span>?
-            </div>
-            <div class="prompt-buttons">
-              <button class="retro-btn" @click="onYes">Yes</button>
-              <button class="retro-btn" @click="onNo">No</button>
-            </div>
+          <!-- Middle Section: Fixed Action Menu -->
+          <div class="retro-middle-section">
+             <div v-if="store.contextMenu.visible && store.contextMenu.options.length > 0" class="fixed-action-menu">
+                <button 
+                  v-for="(opt, idx) in store.contextMenu.options" 
+                  :key="idx"
+                  class="action-btn"
+                  :disabled="!opt.enabled"
+                  @click="handleActionClick(opt)"
+                >
+                  {{ opt.label }}
+                </button>
+             </div>
           </div>
-          
-          <!-- Default Footer status -->
-          <div v-else class="retro-footer-box">
-             <span v-if="store.examineText" style="color: #ccc;">{{ store.examineText }}</span>
-             <span v-else-if="store.combineSourceIndex !== null" style="color: #bc9c6a;">Select item to combine...</span>
-             <span v-else>Press [I] to close. Right-click slot for options.</span>
+          <!-- Bottom Section: Prompts & Footer -->
+          <div class="retro-bottom-section">
+            
+            <!-- Pickup Mode Prompt -->
+            <div v-if="store.isPickupMode" class="retro-prompt-box">
+              <div class="prompt-text">
+                Will you take the<br>
+                <span class="prompt-highlight">{{ store.pickupItemName }}</span>?
+              </div>
+              <div class="prompt-buttons">
+                <button class="retro-btn" @click="onYes">Yes</button>
+                <button class="retro-btn" @click="onNo">No</button>
+              </div>
+            </div>
+            
+            <!-- Default Footer status -->
+            <div v-else class="retro-footer-box">
+               <span v-if="store.examineText" style="color: #ccc;">{{ store.examineText }}</span>
+               <span v-else-if="store.combineSourceIndex !== null" style="color: #bc9c6a;">Select item to combine...</span>
+               <span v-else>Press [I] to close. Click a slot for options.</span>
+            </div>
+            
           </div>
 
         </div>
@@ -94,6 +119,25 @@ const activeItem = ref(null);
 const equippedWeapon = computed(() => {
   return store.inventory.find(i => i && i.equipped && i.type === 'weapon');
 });
+
+const healthStatusClass = computed(() => {
+   if (store.healthPercent > 50) return 'health-fine';
+   if (store.healthPercent > 20) return 'health-caution';
+   return 'health-danger';
+});
+
+const healthStatusText = computed(() => {
+   if (store.healthPercent > 50) return 'Fine';
+   if (store.healthPercent > 20) return 'Caution';
+   return 'Danger';
+});
+
+function handleActionClick(opt) {
+  if (opt.enabled && typeof opt.action === 'function') {
+    opt.action();
+    store.contextMenu.visible = false;
+  }
+}
 
 function hoverItem(item) {
    if (item) activeItem.ref = item;

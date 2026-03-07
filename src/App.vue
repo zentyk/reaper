@@ -7,7 +7,6 @@
     <div id="levelText" class="level-text">{{ store.levelText }}</div>
     
     <InventoryScreen />
-    <ContextMenu />
     <GameHUD v-show="!store.isStartScreenVisible && !store.isGameOverVisible" />
     
     <div v-show="store.feedbackMessage" class="feedback-message">
@@ -25,7 +24,6 @@ import StartScreen from './components/ui/StartScreen.vue'
 import GameOverScreen from './components/ui/GameOverScreen.vue'
 import GameHUD from './components/ui/GameHUD.vue'
 import InventoryScreen from './components/ui/InventoryScreen.vue'
-import ContextMenu from './components/ui/ContextMenu.vue'
 
 // Import the legacy vanilla Game entrypoint
 import { Game } from '../js/Game.js'
