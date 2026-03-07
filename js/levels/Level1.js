@@ -3,20 +3,36 @@ import { Zombie } from '../Zombie.js';
 
 export function setupLevel1(game) {
     // --- Level Configuration ---
-    
+
     // Audio
     game.audio.playMusic(1);
 
     // Cameras
-    game.cameras.north.position.set(0, 12, -12);
-    game.cameras.north.lookAt(0, 0, 0);
-    
-    game.cameras.south.position.set(0, 12, 12);
-    game.cameras.south.lookAt(0, 0, 0);
-    
-    game.activeCamera = game.cameras.north;
+    game.cameras[1] = [
+        {
+            camera: game.cameras.corner,
+            pos: [-10, 8, -10], lookAt: [-5, 0, -5],
+            bounds: { minX: -100, maxX: -5, minZ: -100, maxZ: -5 }
+        },
+        {
+            camera: game.cameras.south,
+            pos: [0, 10, 15], lookAt: [0, 0, 0],
+            bounds: { minX: -100, maxX: 100, minZ: 0, maxZ: 100 }
+        },
+        {
+            camera: game.cameras.main,
+            pos: [0, 10, -15], lookAt: [0, 0, 0],
+            bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 }
+        }
+    ];
 
-    // Lights - Clear and Re-add
+    // Set initial camera
+    const mainCam = game.cameras[1][2];
+    game.activeCamera = mainCam.camera;
+    game.activeCamera.position.set(...mainCam.pos);
+    game.activeCamera.lookAt(...mainCam.lookAt);
+
+    // Lights
     game.scene.children.filter(obj => obj.isLight).forEach(l => game.scene.remove(l));
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -74,7 +90,7 @@ export function setupLevel1(game) {
         if (game.gameState.isZombieDead(1, data.id)) return;
         game.levelManager.createZombie(data.id, data.pos[0], data.pos[2]);
     });
-    
+
     // Set Player Spawn
     game.player.container.position.set(0, 0, 0);
 }

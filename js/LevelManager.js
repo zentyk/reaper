@@ -5,12 +5,43 @@ export class LevelManager {
     constructor(game) {
         this.game = game;
         this.currentLevel = 1;
-        
+
         // Cameras
         this.cameras = {
             north: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
-            south: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
+            south: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
+            main: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
+            corner: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
         };
+    }
+
+    update(dt) {
+        if (!this.game.playerEntity || !this.game.cameras[this.game.levelManager.currentLevel]) return;
+
+        const playerTransform = this.game.playerEntity.components.Transform;
+        if (!playerTransform) return;
+
+        const px = playerTransform.position.x;
+        const pz = playerTransform.position.z;
+
+        let targetCamConfig = null;
+
+        if (this.game.cameras[this.game.levelManager.currentLevel]) {
+            const levelCameras = this.game.cameras[this.game.levelManager.currentLevel];
+            for (const cam of levelCameras) {
+                if (px >= cam.bounds.minX && px <= cam.bounds.maxX &&
+                    pz >= cam.bounds.minZ && pz <= cam.bounds.maxZ) {
+                    targetCamConfig = cam;
+                    break;
+                }
+            }
+        }
+
+        if (targetCamConfig && this.game.activeCamera !== targetCamConfig.camera) {
+            this.game.activeCamera = targetCamConfig.camera;
+            this.game.activeCamera.position.set(...targetCamConfig.pos);
+            this.game.activeCamera.lookAt(...targetCamConfig.lookAt);
+        }
     }
 
     loadLevel(levelNumber) {
@@ -39,7 +70,7 @@ export class LevelManager {
             }
         }
         this.game.world.entities = [];
-        
+
         // Clear lights
         this.game.scene.children.filter(obj => obj.isLight).forEach(l => this.game.scene.remove(l));
     }
@@ -65,7 +96,7 @@ export class LevelManager {
     createEntity(components, id = null) {
         const entity = this.game.world.createEntity();
         if (id) entity.persistentId = id; // Store persistent ID on entity
-        
+
         for (const component of components) {
             this.game.world.addComponent(entity, component);
             if (component instanceof MeshComponent) {
@@ -78,10 +109,28 @@ export class LevelManager {
     }
 
     setupLevel1() {
-        // Cameras
-        this.game.cameras.north.position.set(0, 12, -12);
-        this.game.cameras.north.lookAt(0, 0, 0);
-        this.game.activeCamera = this.game.cameras.north;
+        // Cameras handled dynamically by update()
+        this.game.cameras[1] = [
+            {
+                camera: this.cameras.corner,
+                pos: [-10, 8, -10], lookAt: [-5, 0, -5],
+                bounds: { minX: -100, maxX: -5, minZ: -100, maxZ: -5 }
+            },
+            {
+                camera: this.cameras.south,
+                pos: [0, 10, 15], lookAt: [0, 0, 0],
+                bounds: { minX: -100, maxX: 100, minZ: 0, maxZ: 100 }
+            },
+            {
+                camera: this.cameras.main,
+                pos: [0, 10, -15], lookAt: [0, 0, 0],
+                bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 }
+            }
+        ];
+
+        this.game.activeCamera = this.game.cameras[1][2].camera; // Default to main
+        this.game.activeCamera.position.set(...this.game.cameras[1][2].pos);
+        this.game.activeCamera.lookAt(...this.game.cameras[1][2].lookAt);
 
         // Player
         this.createPlayer(0, 0, 0);
@@ -153,7 +202,7 @@ export class LevelManager {
         const gun = new THREE.Mesh(gunGeo, gunMat);
         gun.position.set(0.3, 1.4, -0.4);
         container.add(gun);
-        
+
         // Store gun ref on container for easy access if needed (optional)
         container.userData.gun = gun;
 
@@ -167,10 +216,10 @@ export class LevelManager {
             new Inventory(),
             new Weapon(15, 15)
         ]);
-        
+
         // Link player to game for legacy access
-        this.game.playerEntity = entity; 
-        
+        this.game.playerEntity = entity;
+
         // Update Player class reference if it exists
         if (this.game.player) {
             this.game.player.container = container;
@@ -225,21 +274,21 @@ export class LevelManager {
             geometry = new THREE.CylinderGeometry(0.1, 0.1, 0.3, 8);
             material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
         }
-        
+
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(x, y, z);
-        
+
         const entity = this.createEntity([
             new Transform(x, y, z),
             new MeshComponent(mesh),
             new CollectibleTag(type, amount, name)
         ], id);
-        
+
         if (type === 'key') {
             mesh.visible = false;
             this.game.keyEntity = entity;
         }
-        
+
         this.game.interactables.push(entity);
     }
 
@@ -248,7 +297,7 @@ export class LevelManager {
         const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(x, y, z);
-        
+
         const entity = this.createEntity([
             new Transform(x, y, z),
             new MeshComponent(mesh),
@@ -256,7 +305,7 @@ export class LevelManager {
             new ObstacleTag(),
             new Collider(Math.max(w, d) / 2)
         ], id);
-        
+
         this.game.interactables.push(entity);
         this.game.obstacles.push(entity);
     }

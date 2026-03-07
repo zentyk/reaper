@@ -74,28 +74,28 @@ export class Game {
         console.log("Game Starting...");
         this.ui.hideStartScreen();
         this.isPaused = false;
-        
+
         // Load Level 1
         this.levelManager.loadLevel(1);
-        
+
         // Update AISystem with new pathfinder
         const aiSystem = this.world.systems.find(s => s instanceof AISystem);
         if (aiSystem) {
             aiSystem.pathfinder = this.levelManager.pathfinder;
         }
     }
-    
+
     changeLevel(levelNumber) {
         this.isPaused = true;
         this.ui.fadeOut(() => {
             this.levelManager.loadLevel(levelNumber);
-            
+
             // Update AI System
             const aiSystem = this.world.systems.find(s => s instanceof AISystem);
             if (aiSystem) {
                 aiSystem.pathfinder = this.levelManager.pathfinder;
             }
-            
+
             this.isPaused = false;
         });
     }
@@ -104,7 +104,65 @@ export class Game {
     zombieKilled(id) {
         if (id) {
             this.gameState.recordZombieDeath(this.levelManager.currentLevel, id);
+
+            // Level 1 Key Cutscene Trigger
+            if (this.levelManager.currentLevel === 1) {
+                const z1 = this.gameState.isZombieDead(1, 'zombie1');
+                const z2 = this.gameState.isZombieDead(1, 'zombie2');
+                const z3 = this.gameState.isZombieDead(1, 'zombie3');
+
+                if (z1 && z2 && z3 && !this.gameState.cutscenePlayed) {
+                    this.playKeyCutscene();
+                }
+            }
         }
+    }
+
+    playKeyCutscene() {
+        if (this.gameState.cutscenePlayed) return;
+        this.gameState.cutscenePlayed = true;
+
+        console.log("Playing cutscene...");
+        this.isPaused = true; // Pause game mechanics
+
+        // Save current camera
+        const previousCamera = this.activeCamera;
+
+        // Set cutscene camera
+        this.cameras.cutscene.position.set(3, 3, 5);
+        this.cameras.cutscene.lookAt(3, 0.1, 2); // Look at key pos
+        this.activeCamera = this.cameras.cutscene;
+
+        // Unhide the key
+        if (this.keyEntity && this.keyEntity.components.MeshComponent) {
+            const keyMesh = this.keyEntity.components.MeshComponent.mesh;
+            keyMesh.visible = true;
+
+            // Add a simple pop animation setup
+            keyMesh.position.y = 2; // Start high
+            const targetY = 0.1;
+            let time = 0;
+
+            const animateKey = () => {
+                if (!this.isPaused && this.activeCamera !== this.cameras.cutscene) return; // Cutscene over
+
+                requestAnimationFrame(animateKey);
+                if (keyMesh.position.y > targetY) {
+                    keyMesh.position.y -= 0.05;
+                    keyMesh.rotation.y += 0.1;
+                } else {
+                    keyMesh.position.y = targetY;
+                    keyMesh.rotation.y += 0.05; // Spin slowly
+                }
+            };
+            animateKey();
+        }
+
+        // Return to normal after 3 seconds
+        setTimeout(() => {
+            this.activeCamera = previousCamera;
+            this.isPaused = false;
+        }, 3000);
     }
 
     itemCollected(id) {
@@ -120,7 +178,8 @@ export class Game {
 
         if (!this.isPaused) {
             this.world.update(dt);
-            
+            this.levelManager.update(dt);
+
             // Cleanup destroyed entities
             for (let i = this.world.entities.length - 1; i >= 0; i--) {
                 if (this.world.entities[i].isDestroyed) {
@@ -128,17 +187,17 @@ export class Game {
                 }
             }
         }
-        
+
         // Render
         if (this.activeCamera) {
             this.renderer.render(this.scene, this.activeCamera);
         }
-        
+
         // Legacy Update for Player (UI/Input)
         if (this.player) {
-             this.player.update(); 
+            this.player.update();
         }
-        
+
         this.input.update();
     }
 }
