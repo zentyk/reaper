@@ -11,6 +11,14 @@ export class InteractionSystem {
         if (this.input.isKeyPressed(' ')) {
             const player = entities.find(e => e.components.PlayerTag);
             if (player) {
+                const inputState = player.components.InputState;
+                const weapon = player.components.Weapon;
+
+                // Do not interact if the player is aiming an equipped weapon
+                if (inputState && inputState.aim && weapon && weapon.isEquipped) {
+                    return;
+                }
+
                 this.checkInteractions(player, entities);
             }
         }
