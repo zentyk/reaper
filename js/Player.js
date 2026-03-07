@@ -295,4 +295,31 @@ export class Player {
         }
         this.pendingCollectible.isDestroyed = true;
     }
+
+    // Door Logic
+    tryOpenDoor(door) {
+        // Check if player has the key
+        const hasKey = this.inventory.some(item => item && item.id === 'key');
+        
+        if (hasKey) {
+            this.initiateLevelChange(door.components.DoorTag.targetLevel);
+        } else {
+            this.game.ui.showFeedback("It's locked. You need a key.");
+        }
+    }
+    
+    initiateLevelChange(targetLevel) {
+        // Fade out and load next level
+        this.game.audio.fadeOutMusic();
+        
+        const fadeOverlay = document.getElementById('fadeOverlay');
+        if (fadeOverlay) {
+            fadeOverlay.style.opacity = '1';
+            setTimeout(() => {
+                this.game.changeLevel(targetLevel);
+            }, 500); // Wait for fade
+        } else {
+            this.game.changeLevel(targetLevel);
+        }
+    }
 }

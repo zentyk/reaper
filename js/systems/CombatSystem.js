@@ -120,22 +120,15 @@ export class CombatSystem {
     updateAmmoUI(weapon) {
         let totalAmmo = 0;
         
-        // Debugging
-        if (!this.game.player) {
-            console.error("CombatSystem: this.game.player is undefined!");
-        } else if (!this.game.player.inventory) {
-            console.error("CombatSystem: this.game.player.inventory is undefined!");
-        }
-
         if (this.game.player && this.game.player.inventory) {
              const ammoItem = this.game.player.inventory.find(i => i && i.id === 'ammo');
              if (ammoItem) {
                  totalAmmo = ammoItem.count;
              } else {
-                 // This is expected if ammo is 0 and we removed it, or if not found.
-                 // But we initialized it.
-                 // console.warn("Ammo item not found in inventory!", this.game.player.inventory);
+                 // console.warn("Ammo item not found in inventory!");
              }
+        } else {
+            console.warn("Player or inventory not found!");
         }
         this.game.ui.updateAmmo(weapon.ammo, totalAmmo);
     }
