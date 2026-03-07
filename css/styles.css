@@ -30,7 +30,8 @@ canvas {
     width: 100%;
     height: 100%;
     background-color: #111;
-    display: flex; /* Can be toggled to flex via JS/WebComponent attached-styles but default depends on implementation. We define block style here. */
+    display: flex;
+    /* Can be toggled to flex via JS/WebComponent attached-styles but default depends on implementation. We define block style here. */
     justify-content: center;
     align-items: center;
     flex-direction: column;
@@ -71,14 +72,14 @@ canvas {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: black;
+    background-color: transparent;
     display: none;
     justify-content: center;
     align-items: center;
     flex-direction: column;
     z-index: 10;
     opacity: 0;
-    transition: opacity 1s ease-in;
+    transition: background-color 2s ease-in, opacity 2s ease-in;
 }
 
 .game-over-screen--visible {
@@ -86,11 +87,25 @@ canvas {
     opacity: 1;
 }
 
+.game-over-screen--white {
+    background-color: white;
+}
+
+.game-over-screen--black {
+    background-color: black;
+}
+
 .game-over-screen__text {
     color: #880000;
     font-size: 5rem;
     font-weight: bold;
     text-shadow: 0 0 10px red;
+    opacity: 0;
+    transition: opacity 2s ease-in;
+}
+
+.game-over-screen__text--visible {
+    opacity: 1;
 }
 
 /* --- Block: Level Text --- */
@@ -110,7 +125,8 @@ canvas {
     position: absolute;
     bottom: 20px;
     left: 20px;
-    display: none; /* hidden initially */
+    display: none;
+    /* hidden initially */
     flex-direction: column;
     gap: 10px;
     pointer-events: none;
@@ -124,7 +140,7 @@ canvas {
 .hud-display {
     color: white;
     font-size: 1.5rem;
-    background-color: rgba(0,0,0,0.5);
+    background-color: rgba(0, 0, 0, 0.5);
     padding: 10px;
     border-radius: 5px;
     display: flex;
@@ -210,7 +226,8 @@ canvas {
     grid-template-columns: repeat(3, 100px);
     grid-template-rows: repeat(2, 100px);
     gap: 10px;
-    position: relative; /* For the "Select item..." instruction div */
+    position: relative;
+    /* For the "Select item..." instruction div */
 }
 
 /* --- Block: Inventory Slot --- */
@@ -244,7 +261,7 @@ canvas {
 
 .inventory-screen__instruction {
     position: absolute;
-    top: 80px; 
+    top: 80px;
     left: 0;
     width: 100%;
     text-align: center;

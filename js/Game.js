@@ -126,7 +126,7 @@ export class Game {
 
         setTimeout(() => {
             window.location.reload();
-        }, 5000);
+        }, 8500);
     }
 
     playKeyCutscene() {
