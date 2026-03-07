@@ -21,16 +21,22 @@ export class InteractionSystem {
 
         for (const entity of entities) {
             if (entity === player) continue;
-            
+
             const transform = entity.components.Transform;
             if (!transform) continue;
 
             // 2D distance check
             const dx = pTransform.position.x - transform.position.x;
             const dz = pTransform.position.z - transform.position.z;
-            const dist = Math.sqrt(dx*dx + dz*dz);
+            const dist = Math.sqrt(dx * dx + dz * dz);
 
             if (dist < 2.0) {
+                // Ensure we only interact with visible entities
+                const meshComp = entity.components.MeshComponent;
+                if (meshComp && meshComp.mesh && !meshComp.mesh.visible) {
+                    continue;
+                }
+
                 if (entity.components.CollectibleTag) {
                     // Delegate to Player controller for UI/Inventory management
                     this.game.player.openPickupPrompt(entity);
