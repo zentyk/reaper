@@ -1,4 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@latest/build/three.module.js';
+import { Zombie } from '../Zombie.js';
 
 export function setupLevel1(game) {
     // --- Level Configuration ---
@@ -54,24 +55,24 @@ export function setupLevel1(game) {
 
     // Obstacles
     levelObjects.obstacles.forEach(data => {
-        game.levelManager.createObstacle(data.x, data.z, data.w, data.h);
+        game.levelManager.createObstacle(data.id, data.x, data.z, data.w, data.h);
     });
 
     // Collectibles
     levelObjects.collectibles.forEach(data => {
         if (game.gameState.isItemCollected(1, data.id)) return;
-        game.levelManager.createCollectible(data.type, data.amount, data.name, data.pos[0], data.pos[1], data.pos[2]);
+        game.levelManager.createCollectible(data.id, data.type, data.amount, data.name, data.pos[0], data.pos[1], data.pos[2]);
     });
 
     // Doors
     levelObjects.doors.forEach(data => {
-        game.levelManager.createDoor(data.pos[0], data.pos[1], data.pos[2], data.size[0], data.size[1], data.size[2], data.targetLevel);
+        game.levelManager.createDoor(data.id, data.pos[0], data.pos[1], data.pos[2], data.size[0], data.size[1], data.size[2], data.targetLevel);
     });
 
     // Zombies
     levelObjects.zombies.forEach(data => {
         if (game.gameState.isZombieDead(1, data.id)) return;
-        game.levelManager.createZombie(data.pos[0], data.pos[2]);
+        game.levelManager.createZombie(data.id, data.pos[0], data.pos[2]);
     });
     
     // Set Player Spawn
