@@ -175,6 +175,13 @@ canvas {
     font-weight: bold;
 }
 
+.hud__cheats {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: auto;
+}
+
 .hud__cheat-btn {
     pointer-events: auto;
     background-color: #333;

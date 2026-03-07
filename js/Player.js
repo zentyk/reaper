@@ -35,6 +35,16 @@ export class Player {
                 this.game.ui.updateHealth(100, 100);
             }
         });
+
+        document.addEventListener('collider-cheat-toggle', () => {
+            this.game.showColliders = !this.game.showColliders;
+            const btn = document.querySelector('#colliderCheatBtn');
+            if (btn) {
+                btn.innerText = `Show Colliders: ${this.game.showColliders ? 'ON' : 'OFF'}`;
+                btn.classList.toggle('hud__cheat-btn--active', this.game.showColliders);
+            }
+            this.game.toggleColliderVisuals(this.game.showColliders);
+        });
     }
 
     setupPickupUI() {

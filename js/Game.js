@@ -49,6 +49,7 @@ export class Game {
 
         // --- Game State ---
         this.isPaused = true;
+        this.showColliders = false;
 
         // --- Systems ---
         this.world.addSystem(new InputSystem());
@@ -64,6 +65,50 @@ export class Game {
         this.lastTime = 0;
         this.animate = this.animate.bind(this);
         this.animate(0);
+    }
+
+    toggleColliderVisuals(show) {
+        if (!this.colliderHelpers) this.colliderHelpers = [];
+
+        if (show) {
+            this.world.entities.forEach(entity => {
+                const collider = entity.components.Collider;
+                const transform = entity.components.Transform;
+
+                if (collider && transform) {
+                    let boxHelper;
+
+                    if (entity.components.MeshComponent && entity.components.MeshComponent.mesh) {
+                        const mesh = entity.components.MeshComponent.mesh;
+                        boxHelper = new THREE.BoxHelper(mesh, 0xff00ff);
+
+                        // Fix for meshes that don't have bounding boxes computed
+                        mesh.traverse((child) => {
+                            if (child.isMesh && child.geometry && !child.geometry.boundingBox) {
+                                child.geometry.computeBoundingBox();
+                            }
+                        });
+                    } else {
+                        // Fallback for logical coliders without meshes (like triggers/doors)
+                        const boxGeometry = new THREE.BoxGeometry(collider.radius * 2, 2, collider.radius * 2);
+                        const edges = new THREE.EdgesGeometry(boxGeometry);
+                        boxHelper = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x00ffff }));
+                        boxHelper.position.copy(transform.position);
+                        boxHelper.position.y += 1; // Center vertical
+                    }
+
+                    this.scene.add(boxHelper);
+                    this.colliderHelpers.push({ helper: boxHelper, entity: entity });
+                }
+            });
+        } else {
+            this.colliderHelpers.forEach(item => {
+                this.scene.remove(item.helper);
+                if (item.helper.geometry) item.helper.geometry.dispose();
+                if (item.helper.material) item.helper.material.dispose();
+            });
+            this.colliderHelpers = [];
+        }
     }
 
     _bindUICallbacks() {
@@ -200,6 +245,20 @@ export class Game {
                 if (this.world.entities[i].isDestroyed) {
                     this.world.entities.splice(i, 1);
                 }
+            }
+
+            // Sync Debug Colliders
+            if (this.showColliders && this.colliderHelpers) {
+                this.colliderHelpers.forEach(item => {
+                    if (item.entity.isDestroyed) return;
+
+                    if (item.entity.components.MeshComponent && item.entity.components.MeshComponent.mesh) {
+                        item.helper.update(); // Three.js native bounds sync
+                    } else if (item.entity.components.Transform) {
+                        item.helper.position.copy(item.entity.components.Transform.position);
+                        item.helper.position.y += 1; // Center vertical
+                    }
+                });
             }
         }
 

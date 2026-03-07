@@ -13,7 +13,10 @@ export class GameHUD extends HTMLElement {
                     <span>AMMO</span>
                     <div class="hud-display__text" id="ammoValue">15 / 30</div>
                 </div>
-                <button class="hud__cheat-btn" id="cheatBtn">Infinite Health: OFF</button>
+                <div class="hud__cheats">
+                    <button class="hud__cheat-btn" id="cheatBtn">Infinite Health: OFF</button>
+                    <button class="hud__cheat-btn" id="colliderCheatBtn">Show Colliders: OFF</button>
+                </div>
             </div>
         `;
     }
@@ -21,6 +24,9 @@ export class GameHUD extends HTMLElement {
     connectedCallback() {
         this.querySelector('#cheatBtn').addEventListener('click', () => {
             this.dispatchEvent(new CustomEvent('cheat-toggle', { bubbles: true }));
+        });
+        this.querySelector('#colliderCheatBtn').addEventListener('click', () => {
+            this.dispatchEvent(new CustomEvent('collider-cheat-toggle', { bubbles: true }));
         });
     }
 
