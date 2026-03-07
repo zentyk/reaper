@@ -63,8 +63,13 @@ export class LevelManager {
         this.game.ui.updateLevelText(levelNumber);
         this.game.audio.playMusic(levelNumber);
 
-        // Initialize WebAssembly Pathfinder using the current Level's bounding layout
-        this.pathfinder = new Pathfinder(100, 100, this.game.obstacles);
+        // Initialize WebAssembly Pathfinder only if enemies are present
+        const hasZombies = this.game.world.entities.some(e => e.components.ZombieTag);
+        if (hasZombies) {
+            this.pathfinder = new Pathfinder(100, 100, this.game.obstacles);
+        } else {
+            this.pathfinder = null;
+        }
     }
 
     clearLevel() {

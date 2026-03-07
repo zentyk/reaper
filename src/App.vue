@@ -8,6 +8,7 @@
     
     <InventoryScreen />
     <GameHUD v-show="!store.isStartScreenVisible && !store.isGameOverVisible" />
+    <DebugMenuModal />
     
     <div v-show="store.feedbackMessage" class="feedback-message">
       {{ store.feedbackMessage }}
@@ -24,6 +25,7 @@ import StartScreen from './components/ui/StartScreen.vue'
 import GameOverScreen from './components/ui/GameOverScreen.vue'
 import GameHUD from './components/ui/GameHUD.vue'
 import InventoryScreen from './components/ui/InventoryScreen.vue'
+import DebugMenuModal from './components/ui/DebugMenuModal.vue'
 
 // Import the legacy vanilla Game entrypoint
 import { Game } from '../js/Game.js'
@@ -31,5 +33,13 @@ import { Game } from '../js/Game.js'
 onMounted(async () => {
     // Keep window.game for global debug access
     window.game = await Game.init();
+
+    // Global Key Listener for Debug Menu (F3)
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F3') {
+        e.preventDefault(); // Prevent browser search
+        store.showDebugMenu = !store.showDebugMenu;
+      }
+    });
 })
 </script>

@@ -17,7 +17,7 @@ export const store = reactive({
     ammoCurrent: 15,
     ammoMax: 30,
     showColliders: false,
-    showDebugHUD: false,
+    showDebugMenu: false,
     instaKillCheat: false,
 
     // Game state
