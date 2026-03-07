@@ -70,6 +70,11 @@ export class AISystem {
             return;
         }
 
+        // Handle Dead
+        if (ai.state === 'dead') {
+            return;
+        }
+
         // If biting, stay put
         if (ai.state === 'biting') {
             return;

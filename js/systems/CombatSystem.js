@@ -245,7 +245,7 @@ export class CombatSystem {
             this.tracerLine.visible = false;
         }, 50);
 
-        const zombies = entities.filter(e => e.components.ZombieTag && e.components.MeshComponent);
+        const zombies = entities.filter(e => e.components.ZombieTag && e.components.MeshComponent && (!e.components.AI || e.components.AI.state !== 'dead'));
         const zombieMeshes = zombies.map(e => e.components.MeshComponent.mesh);
 
         const intersects = this.raycaster.intersectObjects(zombieMeshes);
@@ -312,15 +312,48 @@ export class CombatSystem {
 
     killEntity(entity) {
         console.log("Entity Killed");
-        if (entity.components.MeshComponent) {
-            this.game.scene.remove(entity.components.MeshComponent.mesh);
-        }
-        entity.isDestroyed = true;
 
         if (entity.components.ZombieTag) {
-            if (entity.components.MeshComponent && entity.components.MeshComponent.mesh.userData.id) {
-                this.game.zombieKilled(entity.components.MeshComponent.mesh.userData.id);
+            // Keep the entity in the world but mark it dead
+            if (entity.components.AI) {
+                entity.components.AI.state = 'dead';
             }
+
+            // Visual feedback: lay flat on the ground and darken
+            if (entity.components.MeshComponent && entity.components.MeshComponent.mesh) {
+                const mesh = entity.components.MeshComponent.mesh;
+                mesh.rotation.x = -Math.PI / 2;
+                mesh.position.y = 0.25;
+
+                // Set color to dark red
+                if (mesh.material && mesh.material.color) {
+                    mesh.material.color.setHex(0x550000);
+                }
+
+                if (mesh.userData && mesh.userData.id) {
+                    this.game.zombieKilled(mesh.userData.id);
+                }
+            }
+
+            // Lay the physics collider flat as well
+            if (entity.rigidBody) {
+                const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+                entity.rigidBody.setNextKinematicRotation(quat);
+
+                const currentPos = entity.rigidBody.translation();
+                entity.rigidBody.setNextKinematicTranslation({
+                    x: currentPos.x,
+                    y: 0.25,
+                    z: currentPos.z
+                });
+            }
+            // Do NOT set entity.isDestroyed = true so the physics collider remains in the world.
+        } else {
+            // Fallback for non-zombies
+            if (entity.components.MeshComponent && entity.components.MeshComponent.mesh) {
+                this.game.scene.remove(entity.components.MeshComponent.mesh);
+            }
+            entity.isDestroyed = true;
         }
     }
 
