@@ -12,6 +12,7 @@ import { Input } from './core/Input.js';
 import { AudioHandler } from './AudioHandler.js';
 import { Player } from './Player.js';
 import RAPIER from '@dimforge/rapier3d-compat';
+import doorTextureUrl from '../img/door_texture.png?url';
 
 export class Game {
     static async init() {
@@ -60,6 +61,14 @@ export class Game {
         // --- Game State ---
         this.isPaused = true;
         this.showColliders = false;
+        this.isTransitioning = false;
+
+        // --- Transition Scene ---
+        this.transitionScene = new THREE.Scene();
+        this.transitionCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+        this.transitionCamera.position.z = 2.5;
+        this.doorMesh = null;
+        this.doorPivot = null;
 
         // --- Systems ---
         this.world.addSystem(new InputSystem());
@@ -75,6 +84,8 @@ export class Game {
         this.lastTime = 0;
         this.animate = this.animate.bind(this);
         this.animate(0);
+
+        this._setupTransitionScene();
     }
 
     toggleColliderVisuals(show) {
@@ -125,6 +136,34 @@ export class Game {
         this.ui.callbacks.onStart = () => this.startGame();
     }
 
+    _setupTransitionScene() {
+        // Point light in a black void
+        const light = new THREE.PointLight(0xffddaa, 3.5, 10);
+        light.position.set(1, 0, 3); // Center on door
+        this.transitionScene.add(light);
+
+        // Load the terrifying vintage door texture via Vite
+        const textureLoader = new THREE.TextureLoader();
+        const doorTexture = textureLoader.load(doorTextureUrl);
+        // Let's make it a bit dark and grungy by reducing the emissive
+        const doorMat = new THREE.MeshStandardMaterial({
+            map: doorTexture,
+            roughness: 0.8,
+            color: 0x888888
+        });
+
+        const doorGeo = new THREE.PlaneGeometry(2, 3);
+        this.doorMesh = new THREE.Mesh(doorGeo, doorMat);
+
+        // Create a pivot so it rotates around the hinge (left edge)
+        this.doorPivot = new THREE.Group();
+        this.doorPivot.position.set(-1, 0, 0); // Position pivot at left edge of where door should be
+        this.doorMesh.position.set(1, 0, 0); // Offset mesh to the right of the pivot
+        this.doorPivot.add(this.doorMesh);
+
+        this.transitionScene.add(this.doorPivot);
+    }
+
     startGame() {
         console.log("Game Starting...");
         this.ui.hideStartScreen();
@@ -145,17 +184,103 @@ export class Game {
 
     changeLevel(levelNumber) {
         this.isPaused = true;
-        this.ui.fadeOut(() => {
-            this.levelManager.loadLevel(levelNumber);
 
-            // Update AI System
-            const aiSystem = this.world.systems.find(s => s instanceof AISystem);
-            if (aiSystem) {
-                aiSystem.pathfinder = this.levelManager.pathfinder;
+        // 1. Fade old level to black
+        this.ui.fadeOut(() => {
+            // 2. Hide HUD and show Door Transition Scene
+            this.isTransitioning = true;
+            this.doorPivot.rotation.y = 0; // Reset door
+
+            // 3. Fade in to reveal the door
+            this.ui.fadeIn();
+
+            // 4. Animate door opening, then load new level
+            this.playDoorTransition(() => {
+                // 5. Door finished, fade back to black
+                this.ui.fadeOut(() => {
+                    // 6. Start new level behind the scenes
+                    this.levelManager.loadLevel(levelNumber);
+
+                    // Update AI System
+                    const aiSystem = this.world.systems.find(s => s instanceof AISystem);
+                    if (aiSystem) {
+                        aiSystem.pathfinder = this.levelManager.pathfinder;
+                    }
+
+                    // 7. Swap scenes back and fade into the new level
+                    this.isTransitioning = false;
+                    this.isPaused = false;
+                    this.ui.fadeIn();
+                });
+            });
+        });
+    }
+
+    playDoorTransition(onComplete) {
+        let startTime = null;
+        let isSkipped = false;
+        let animationFrameId = null;
+
+        // Reset state
+        this.transitionCamera.position.z = 2.5;
+        this.doorPivot.rotation.y = 0;
+
+        const skipHandler = (e) => {
+            if (e.code === 'Space' && !isSkipped) {
+                isSkipped = true;
+                window.removeEventListener('keydown', skipHandler);
+                if (animationFrameId !== null) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+
+                // Snap to final state
+                this.doorPivot.rotation.y = Math.PI / 2;
+                this.transitionCamera.position.z = -0.5;
+
+                if (onComplete) onComplete();
+            }
+        };
+        window.addEventListener('keydown', skipHandler);
+
+        const animateSequence = (time) => {
+            if (isSkipped) return;
+            if (!startTime) startTime = time;
+            const elapsed = time - startTime;
+
+            if (elapsed < 2000) {
+                // Phase 1: Contemplate (0-2s)
+                this.doorPivot.rotation.y = 0;
+                this.transitionCamera.position.z = 2.5;
+            } else if (elapsed < 4000) {
+                // Phase 2: Open door (2s - 4s)
+                const progress = (elapsed - 2000) / 2000;
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                this.doorPivot.rotation.y = easeProgress * (Math.PI / 2);
+                this.transitionCamera.position.z = 2.5; // Stay still
+            } else if (elapsed < 6000) {
+                // Phase 3: Walk through (4s - 6s)
+                this.doorPivot.rotation.y = Math.PI / 2; // Door is open
+                const progress = (elapsed - 4000) / 2000;
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                this.transitionCamera.position.z = 2.5 - (easeProgress * 3.0);
+            } else {
+                // Done
+                this.doorPivot.rotation.y = Math.PI / 2;
+                this.transitionCamera.position.z = -0.5;
+
+                window.removeEventListener('keydown', skipHandler);
+
+                // Optional pause before fading to next level
+                setTimeout(() => {
+                    if (onComplete && !isSkipped) onComplete();
+                }, 500);
+                return;
             }
 
-            this.isPaused = false;
-        });
+            animationFrameId = requestAnimationFrame(animateSequence);
+        };
+
+        animationFrameId = requestAnimationFrame(animateSequence);
     }
 
     // --- State Helpers ---
@@ -277,7 +402,9 @@ export class Game {
         }
 
         // Render
-        if (this.activeCamera) {
+        if (this.isTransitioning) {
+            this.renderer.render(this.transitionScene, this.transitionCamera);
+        } else if (this.activeCamera) {
             this.renderer.render(this.scene, this.activeCamera);
         }
 

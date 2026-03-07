@@ -18,6 +18,7 @@
     <div class="hud__cheats" style="pointer-events: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 0.5rem; width: 250px;">
       <ToggleButton v-model="store.showDebugHUD" onLabel="Debug HUD: ON" offLabel="Debug HUD: OFF" size="small" />
       <Button label="Infinite Health: OFF" severity="secondary" size="small" @click="toggleCheat" />
+      <ToggleButton v-model="store.instaKillCheat" onLabel="1-Hit Kill: ON" offLabel="1-Hit Kill: OFF" size="small" />
       <ToggleButton v-model="store.showColliders" onLabel="Show Colliders: ON" offLabel="Show Colliders: OFF" 
         @change="toggleColliderCheat" size="small" />
     </div>

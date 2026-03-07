@@ -1,5 +1,6 @@
 import { PlayerTag, ZombieTag, Transform, Health, Weapon, MeshComponent, InputState, Inventory, Grapple, AI } from '../components.js';
 import * as THREE from 'three';
+import { store } from '../../src/store.js';
 
 export class CombatSystem {
     constructor(game) {
@@ -262,6 +263,12 @@ export class CombatSystem {
 
     damageEntity(entity, amount) {
         const health = entity.components.Health;
+
+        // Apply Insta-Kill cheat to non-player entities
+        if (store.instaKillCheat && !entity.components.PlayerTag) {
+            amount = health.current;
+        }
+
         health.current -= amount;
 
         // Visual feedback

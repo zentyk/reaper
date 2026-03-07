@@ -18,6 +18,7 @@ export const store = reactive({
     ammoMax: 30,
     showColliders: false,
     showDebugHUD: false,
+    instaKillCheat: false,
 
     // Game state
     levelText: 'Level 1',

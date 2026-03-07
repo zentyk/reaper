@@ -65,8 +65,6 @@ export class LevelManager {
 
         // Initialize WebAssembly Pathfinder using the current Level's bounding layout
         this.pathfinder = new Pathfinder(100, 100, this.game.obstacles);
-
-        this.game.ui.fadeIn();
     }
 
     clearLevel() {
