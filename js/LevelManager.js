@@ -49,6 +49,7 @@ export class LevelManager {
 
     async loadLevel(levelNumber) {
         this.currentLevel = levelNumber;
+        this.game.currentLevelIndex = levelNumber;
         console.log(`Loading Level ${levelNumber}`);
 
         this.clearLevel();
@@ -161,11 +162,16 @@ export class LevelManager {
             this.game.cameras[this.currentLevel] = data.cameras.map(c => {
                 const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                 cam.userData.id = c.id;
-                return { camera: cam, pos: c.pos, lookAt: c.lookAt, bounds: c.bounds };
+                if (c.rot) cam.rotation.set(c.rot[0], c.rot[1], c.rot[2]);
+                return { camera: cam, pos: c.pos, lookAt: c.lookAt, rot: c.rot, bounds: c.bounds };
             });
             this.game.activeCamera = this.game.cameras[this.currentLevel][0].camera;
             this.game.activeCamera.position.set(...this.game.cameras[this.currentLevel][0].pos);
-            this.game.activeCamera.lookAt(...this.game.cameras[this.currentLevel][0].lookAt);
+            if (this.game.cameras[this.currentLevel][0].rot) {
+                this.game.activeCamera.rotation.set(...this.game.cameras[this.currentLevel][0].rot);
+            } else if (this.game.cameras[this.currentLevel][0].lookAt) {
+                this.game.activeCamera.lookAt(...this.game.cameras[this.currentLevel][0].lookAt);
+            }
         }
 
         // Lighting based on Level JSON
@@ -195,20 +201,20 @@ export class LevelManager {
 
         // Player Spawn
         if (data.playerSpawn) {
-            this.createPlayer(data.playerSpawn.x, data.playerSpawn.z);
+            this.createPlayer(data.playerSpawn.x, data.playerSpawn.z, data.playerSpawn.rot);
         }
 
         // Zombies
         if (data.zombies) {
             data.zombies.forEach(z => {
-                this.createZombie(z.id, z.pos[0], z.pos[2]);
+                this.createZombie(z.id, z.pos[0], z.pos[2], z.rot);
             });
         }
 
         // Collectibles
         if (data.collectibles) {
             data.collectibles.forEach(c => {
-                this.createCollectible(c.id, c.type || 'ammo', c.amount || 15, c.name || 'Item', c.pos[0], c.pos[1], c.pos[2]);
+                this.createCollectible(c.id, c.type || 'ammo', c.amount || 15, c.name || 'Item', c.pos[0], c.pos[1], c.pos[2], c.rot);
             });
         }
     }
@@ -270,7 +276,7 @@ export class LevelManager {
         // Zombies are loaded from JSON
     }
 
-    createPlayer(x, z) {
+    createPlayer(x, z, rot = null) {
         // Find persistent stats from global store to prevent level-load resets
         const currentHealth = store.healthPercent; // Percent equals flat HP out of 100
         let currentAmmo = 15;
@@ -282,6 +288,7 @@ export class LevelManager {
         // Container Group
         const container = new THREE.Group();
         container.position.set(x, 0, z);
+        if (rot) container.rotation.set(rot[0], rot[1], rot[2]);
 
         // Body
         const bodyGeo = new THREE.BoxGeometry(0.5, 1.8, 0.5);
@@ -320,7 +327,11 @@ export class LevelManager {
         container.userData.gun = gun;
 
         // --- Physics Body ---
-        const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 0.9, z);
+        let rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 0.9, z);
+        if (rot) {
+            const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2]));
+            rigidBodyDesc = rigidBodyDesc.setRotation(q);
+        }
         const rigidBody = this.game.physicsWorld.createRigidBody(rigidBodyDesc);
         // Player is a 1.8m tall capsule (0.9 half-height), 0.3m radius
         const colliderDesc = RAPIER.ColliderDesc.capsule(0.6, 0.25);
@@ -350,15 +361,20 @@ export class LevelManager {
         }
     }
 
-    createZombie(id, x, z) {
+    createZombie(id, x, z, rot = null) {
         if (this.game.gameState.isZombieDead(this.currentLevel, id)) return;
 
         const geometry = new THREE.BoxGeometry(0.5, 1.8, 0.5);
         const material = new THREE.MeshStandardMaterial({ color: 0x0000ff });
         const mesh = new THREE.Mesh(geometry, material);
+        if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
 
         // --- Physics Body ---
-        const rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 0.9, z);
+        let rigidBodyDesc = RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(x, 0.9, z);
+        if (rot) {
+            const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2]));
+            rigidBodyDesc = rigidBodyDesc.setRotation(q);
+        }
         const rigidBody = this.game.physicsWorld.createRigidBody(rigidBodyDesc);
         const colliderDesc = RAPIER.ColliderDesc.capsule(0.6, 0.25);
         this.game.physicsWorld.createCollider(colliderDesc, rigidBody);
@@ -400,7 +416,7 @@ export class LevelManager {
         entity.rigidBody = rigidBody;
     }
 
-    createCollectible(id, type, amount, name, x, y, z) {
+    createCollectible(id, type, amount, name, x, y, z, rot = null) {
         if (this.game.gameState.isItemCollected(this.currentLevel, id)) return;
 
         let geometry, material;
@@ -417,12 +433,18 @@ export class LevelManager {
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.set(x, y, z);
+        if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
 
         const entity = this.createEntity([
             new Transform(x, y, z),
             new MeshComponent(mesh),
             new CollectibleTag(type, amount, name)
         ], id);
+
+        // Apply rotation to ECS Transform
+        if (rot) {
+            entity.components.Transform.rotation.set(rot[0], rot[1], rot[2]);
+        }
 
         if (type === 'key') {
             mesh.visible = false;

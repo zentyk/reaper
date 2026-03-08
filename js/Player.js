@@ -541,6 +541,12 @@ export class Player {
         this.pendingCollectible = null;
         this.game.ui.closePickupMode();
 
+        // Consume the spacebar so we don't instantly interact again on unpause
+        if (this.game.input) {
+            this.game.input.downKeys[' '] = false;
+            this.game.input.keys[' '] = false;
+        }
+
         // Final force hide
         store.isInventoryVisible = false;
         store.isPickupMode = false;

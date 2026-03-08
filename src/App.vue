@@ -18,7 +18,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import * as THREE from 'three'
 import { store } from './store.js'
 
@@ -36,6 +36,11 @@ import { Game } from '../js/Game.js'
 onMounted(async () => {
     // Keep window.game for global debug access
     window.game = await Game.init();
+
+    // Toggle global cursor visibility based on Editor mode
+    watch(() => store.showLevelEditor, (isEditor) => {
+        document.body.style.cursor = isEditor ? 'default' : 'none';
+    }, { immediate: true });
 
     // ── F3 → Debug Menu ──────────────────────────────────────────────
     window.addEventListener('keydown', (e) => {
@@ -118,6 +123,16 @@ function placeObject(tool, pos, game) {
     const newCam = { id: uid, pos: [x, 10, z], lookAt: [0, 0, 0], bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 } };
     d.cameras.push(newCam);
     game.editorGizmos?.addGizmo('camera', uid, x, 10, z);
+
+    // ── Inject live camera for PiP preview
+    const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    cam.userData.id = uid;
+    cam.position.set(x, 10, z);
+    cam.lookAt(0, 0, 0); // Default look-at
+    if (!game.cameras[game.currentLevelIndex]) game.cameras[game.currentLevelIndex] = [];
+    game.cameras[game.currentLevelIndex].push({
+        camera: cam, pos: newCam.pos, lookAt: newCam.lookAt, bounds: newCam.bounds
+    });
   } else if (tool === 'zombie') {
     d.zombies.push({ id: uid, pos: [x, 0, z] });
     game.editorGizmos?.addGizmo('zombie', uid, x, 0.5, z);

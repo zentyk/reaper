@@ -28,7 +28,7 @@ export class InteractionSystem {
         const pTransform = player.components.Transform;
 
         for (const entity of entities) {
-            if (entity === player) continue;
+            if (entity === player || entity.isDestroyed) continue;
 
             const transform = entity.components.Transform;
             if (!transform) continue;

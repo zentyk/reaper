@@ -106,7 +106,7 @@ export class Game {
         // editor-load-level: triggered from the level editor UI
         document.addEventListener('editor-load-level', (e) => {
             const lvl = e.detail?.level;
-            if (lvl) this.loadLevel(lvl);
+            if (lvl && this.levelManager) this.levelManager.loadLevel(lvl);
         });
 
         // Transform Controls (Unity/UE5 Style Gizmos)
@@ -145,10 +145,15 @@ export class Game {
                 const syncItem = (list, yOffset = 0) => {
                     if (!list) return;
                     const it = list.find(i => i.id === id);
-                    if (it && it.pos) {
-                        it.pos[0] = pos.x;
-                        it.pos[1] = pos.y - yOffset;
-                        it.pos[2] = pos.z;
+                    if (it) {
+                        if (it.pos) {
+                            it.pos[0] = pos.x;
+                            it.pos[1] = pos.y - yOffset;
+                            it.pos[2] = pos.z;
+                        }
+                        if (mesh.rotation) {
+                            it.rot = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
+                        }
                     }
                 };
 
@@ -156,6 +161,9 @@ export class Game {
                     this.currentLevelData.playerSpawn.x = pos.x;
                     this.currentLevelData.playerSpawn.y = pos.y - 1.0;
                     this.currentLevelData.playerSpawn.z = pos.z;
+                    if (mesh.rotation) {
+                        this.currentLevelData.playerSpawn.rot = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
+                    }
                 } else if (type === 'camera') {
                     syncItem(this.currentLevelData.cameras, 0);
                     if (this.cameras && this.cameras[this.currentLevelIndex]) {

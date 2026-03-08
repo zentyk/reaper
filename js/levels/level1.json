@@ -1,167 +1,260 @@
 {
-    "playerSpawn": {
-        "x": 0,
-        "y": 0,
-        "z": 0
+  "playerSpawn": {
+    "x": 0,
+    "y": 0,
+    "z": 0
+  },
+  "cameras": [
+    {
+      "id": "corner",
+      "pos": [
+        -10,
+        8,
+        -10
+      ],
+      "lookAt": [
+        -5,
+        0,
+        -5
+      ],
+      "bounds": {
+        "minX": -100,
+        "maxX": -5,
+        "minZ": -100,
+        "maxZ": -5
+      }
     },
-    "cameras": [
-        {
-            "id": "corner",
-            "pos": [
-                -10,
-                8,
-                -10
-            ],
-            "lookAt": [
-                -5,
-                0,
-                -5
-            ],
-            "bounds": {
-                "minX": -100,
-                "maxX": -5,
-                "minZ": -100,
-                "maxZ": -5
-            }
-        },
-        {
-            "id": "south",
-            "pos": [
-                0,
-                10,
-                15
-            ],
-            "lookAt": [
-                0,
-                0,
-                0
-            ],
-            "bounds": {
-                "minX": -100,
-                "maxX": 100,
-                "minZ": 0,
-                "maxZ": 100
-            }
-        },
-        {
-            "id": "main",
-            "pos": [
-                0,
-                10,
-                -15
-            ],
-            "lookAt": [
-                0,
-                0,
-                0
-            ],
-            "bounds": {
-                "minX": -100,
-                "maxX": 100,
-                "minZ": -100,
-                "maxZ": 100
-            }
-        }
-    ],
-    "zombies": [
-        {
-            "id": "zombie1",
-            "pos": [
-                -7,
-                0,
-                -7
-            ]
-        },
-        {
-            "id": "zombie2",
-            "pos": [
-                7,
-                0,
-                -7
-            ]
-        },
-        {
-            "id": "zombie3",
-            "pos": [
-                0,
-                0,
-                5
-            ]
-        }
-    ],
-    "collectibles": [
-        {
-            "id": "ammo1",
-            "type": "ammo",
-            "amount": 15,
-            "name": "Handgun Ammo",
-            "pos": [
-                2,
-                0.15,
-                2
-            ]
-        },
-        {
-            "id": "key1",
-            "type": "key",
-            "amount": 1,
-            "name": "Exit Key",
-            "pos": [
-                3,
-                0.1,
-                2
-            ]
-        },
-        {
-            "id": "herb1",
-            "type": "health",
-            "amount": 50,
-            "name": "Green Herb",
-            "pos": [
-                -2,
-                0.15,
-                -2
-            ]
-        }
-    ],
-    "doors": [
-        {
-            "id": "door1",
-            "pos": [
-                0,
-                1.5,
-                -10
-            ],
-            "size": [
-                2,
-                3,
-                0.2
-            ],
-            "targetLevel": 2
-        }
-    ],
-    "lights": [
-        {
-            "id": "main_light",
-            "pos": [
-                0,
-                3,
-                0
-            ],
-            "color": 16755285,
-            "intensity": 10,
-            "distance": 15
-        },
-        {
-            "id": "door_light",
-            "pos": [
-                0,
-                3,
-                -10
-            ],
-            "color": 16729156,
-            "intensity": 5,
-            "distance": 5
-        }
-    ]
+    {
+      "id": "south",
+      "pos": [
+        0,
+        10,
+        15
+      ],
+      "lookAt": [
+        0,
+        0,
+        0
+      ],
+      "bounds": {
+        "minX": -100,
+        "maxX": 100,
+        "minZ": 0,
+        "maxZ": 100
+      }
+    },
+    {
+      "id": "main",
+      "pos": [
+        0,
+        10,
+        -15
+      ],
+      "lookAt": [
+        0,
+        0,
+        0
+      ],
+      "bounds": {
+        "minX": -100,
+        "maxX": 100,
+        "minZ": -100,
+        "maxZ": 100
+      }
+    }
+  ],
+  "zombies": [
+    {
+      "id": "zombie1",
+      "pos": [
+        -7,
+        0,
+        -7
+      ]
+    },
+    {
+      "id": "zombie2",
+      "pos": [
+        7,
+        0,
+        -7
+      ]
+    },
+    {
+      "id": "zombie3",
+      "pos": [
+        0,
+        0,
+        5
+      ]
+    }
+  ],
+  "collectibles": [
+    {
+      "id": "ammo1",
+      "type": "ammo",
+      "amount": 15,
+      "name": "Handgun Ammo",
+      "pos": [
+        2,
+        0.15,
+        2
+      ]
+    },
+    {
+      "id": "key1",
+      "type": "key",
+      "amount": 1,
+      "name": "Exit Key",
+      "pos": [
+        3,
+        0.1,
+        2
+      ]
+    },
+    {
+      "id": "herb1",
+      "type": "health",
+      "amount": 50,
+      "name": "Green Herb",
+      "pos": [
+        -2,
+        0.15,
+        -2
+      ]
+    }
+  ],
+  "doors": [
+    {
+      "id": "door1",
+      "pos": [
+        0,
+        1.5,
+        -10
+      ],
+      "size": [
+        2,
+        3,
+        0.2
+      ],
+      "targetLevel": 2
+    }
+  ],
+  "lights": [
+    {
+      "id": "main_light",
+      "pos": [
+        0,
+        3,
+        0
+      ],
+      "color": 16755285,
+      "intensity": 10,
+      "distance": 15
+    },
+    {
+      "id": "door_light",
+      "pos": [
+        0,
+        3,
+        -8.632321765126825
+      ],
+      "color": 16729156,
+      "intensity": 5,
+      "distance": 5,
+      "rot": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "light_1772941881908",
+      "pos": [
+        -10.76977458752279,
+        2.050000000745058,
+        -5.70571217186583
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941883574",
+      "pos": [
+        -3.5747472148115413,
+        2.050000000745058,
+        5.945906403326911
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941884954",
+      "pos": [
+        5.195085540264313,
+        2.0500000007450563,
+        5.47399364192644
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941886372",
+      "pos": [
+        5.63998712018881,
+        2.0500000007450563,
+        -4.9264029116784425
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941887784",
+      "pos": [
+        4.275061029266296,
+        2.050000000745058,
+        -10.859952888098535
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941888698",
+      "pos": [
+        -6.882546573416672,
+        2.050000000745058,
+        -14.829161859371391
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941889334",
+      "pos": [
+        -4.16016071259963,
+        2.0500000007450563,
+        -10.30307437395654
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    },
+    {
+      "id": "light_1772941890442",
+      "pos": [
+        -6.693679312528779,
+        2.0500000007450563,
+        -1.3501432444955874
+      ],
+      "color": 16768426,
+      "intensity": 5,
+      "distance": 10
+    }
+  ]
 }

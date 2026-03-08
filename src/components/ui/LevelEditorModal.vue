@@ -8,12 +8,12 @@
       <div class="editor-section">
         <div class="editor-label">LEVEL</div>
         <div class="editor-btn-row">
-          <button
-            v-for="n in [1, 2]" :key="n"
-            :class="['ed-btn', store.editorLevel === n ? 'active' : '']"
-            @click="switchLevel(n)">
-            LVL {{ n }}
-          </button>
+          <select 
+            class="ed-select" 
+            :value="store.editorLevel" 
+            @change="switchLevel(+$event.target.value)">
+            <option v-for="n in 10" :key="n" :value="n">Level {{ n }}</option>
+          </select>
         </div>
       </div>
 
@@ -189,33 +189,60 @@ watch(() => store.editorSelectedId, id => {
 // ─── Position fields ──────────────────────────────────────────────────
 const editableFields = computed(() => {
   if (!selected.value) return [];
-  return ['X', 'Y', 'Z'].map((ax, i) => ({ key: i, label: `Pos ${ax}` }));
+  const fields = [
+    { key: 'px', label: 'Pos X' }, { key: 'py', label: 'Pos Y' }, { key: 'pz', label: 'Pos Z' },
+    { key: 'rx', label: 'Rot X' }, { key: 'ry', label: 'Rot Y' }, { key: 'rz', label: 'Rot Z' }
+  ];
+  return fields;
 });
 
-function getField(axisIdx) {
+function getField(key) {
   const sel = selected.value;
   if (!sel) return 0;
+  
+  let pos = sel.pos || [0,0,0];
+  let rot = sel.rot || [0,0,0];
+
   if (sel.type === 'playerSpawn') {
     const sp = d.value?.playerSpawn;
-    return [sp?.x, sp?.y, sp?.z][axisIdx] ?? 0;
+    pos = [sp?.x || 0, sp?.y || 0, sp?.z || 0];
+    rot = sp?.rot || [0,0,0];
   }
-  return sel.pos[axisIdx] ?? 0;
+
+  const map = { px: pos[0], py: pos[1], pz: pos[2], rx: rot[0], ry: rot[1], rz: rot[2] };
+  return map[key] ?? 0;
 }
 
-function setField(axisIdx, value) {
+function setField(key, value) {
   const v = parseFloat(value);
   const data = d.value;
   const sel = selected.value;
   if (!data || !sel) return;
 
+  const isRot = key.startsWith('r');
+  const axisIdx = key.endsWith('x') ? 0 : key.endsWith('y') ? 1 : 2;
+
   if (sel.type === 'playerSpawn') {
-    const keys = ['x', 'y', 'z'];
-    data.playerSpawn[keys[axisIdx]] = v;
-    window.game?.editorGizmos?.moveById('playerSpawn', data.playerSpawn.x, data.playerSpawn.y + 1, data.playerSpawn.z);
+    if (isRot) {
+      if (!data.playerSpawn.rot) data.playerSpawn.rot = [0,0,0];
+      data.playerSpawn.rot[axisIdx] = v;
+      // We don't have a specific gizmo rotate by ID function easily accessible 
+      // without directly digging into Game, but dragging the gizmo handles it anyway.
+    } else {
+      const keys = ['x', 'y', 'z'];
+      data.playerSpawn[keys[axisIdx]] = v;
+      window.game?.editorGizmos?.moveById('playerSpawn', data.playerSpawn.x, data.playerSpawn.y + 1, data.playerSpawn.z);
+    }
     return;
   }
-  sel.pos[axisIdx] = v;
-  window.game?.editorGizmos?.moveById(sel.id, sel.pos[0], sel.pos[1], sel.pos[2]);
+
+  if (isRot) {
+    if (!sel.rot) sel.rot = [0,0,0];
+    sel.rot[axisIdx] = v;
+  } else {
+    sel.pos[axisIdx] = v;
+    window.game?.editorGizmos?.moveById(sel.id, sel.pos[0], sel.pos[1], sel.pos[2]);
+  }
 }
 
 function updateDataField(key, value) {
@@ -388,6 +415,20 @@ function formatPos(obj) {
 
 .ed-btn:hover { background: #1a3a5a; border-color: #5bcffa; }
 .ed-btn.active { background: #0e3256; border-color: #5bcffa; color: #fff; }
+
+.ed-select {
+  background: #0d1f30;
+  border: 1px solid #1e3a5f;
+  color: #7ad4f5;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  padding: 5px 8px;
+  cursor: pointer;
+  width: 100%;
+  outline: none;
+}
+.ed-select:hover { border-color: #5bcffa; }
+.ed-select option { background: #080a14; color: #7ad4f5; }
 
 .editor-btn-row { display: flex; gap: 4px; }
 .editor-btn-row .ed-btn { flex: 1; text-align: center; }
