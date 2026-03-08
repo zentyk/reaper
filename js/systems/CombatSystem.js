@@ -232,10 +232,24 @@ export class CombatSystem {
         this._tempOrigin.copy(transform.position);
         this._tempOrigin.y += 1.4;
 
-        // ── Auto-aim (Normal / Easy only) ────────────────────────────────
+        // Collect obstacle meshes for LoS checks
+        const obstacleMeshes = entities
+            .filter(e => e.components.ObstacleTag && e.components.MeshComponent)
+            .map(e => e.components.MeshComponent.mesh);
+
+        // Helper: true if a clear line-of-sight exists from origin to worldPos
+        const hasLoS = (worldPos) => {
+            const toTarget = new THREE.Vector3().subVectors(worldPos, this._tempOrigin);
+            const dist = toTarget.length();
+            const losRay = new THREE.Raycaster(this._tempOrigin, toTarget.clone().normalize(), 0, dist);
+            const hits = losRay.intersectObjects(obstacleMeshes, false);
+            return hits.length === 0;
+        };
+
+        // ── Auto-aim (Normal / Easy only, LoS-checked) ───────────────────
         if (store.difficulty !== 'hard') {
-            const AUTO_AIM_RANGE = 15;          // max distance
-            const AUTO_AIM_CONE = Math.cos(Math.PI / 4); // 45° half-angle dot threshold
+            const AUTO_AIM_RANGE = 15;
+            const AUTO_AIM_CONE = Math.cos(Math.PI / 4); // 45° half-angle
 
             let bestDot = AUTO_AIM_CONE;
             let bestDir = null;
@@ -259,17 +273,18 @@ export class CombatSystem {
                 toZombie.normalize();
                 const flatDir = this._tempDir.clone().setY(0).normalize();
                 const dot = flatDir.dot(toZombie);
+                if (dot <= bestDot) continue;
 
-                if (dot > bestDot) {
-                    bestDot = dot;
-                    bestDir = toZombie;
-                }
+                // Skip if an obstacle is in the way
+                const zombieCenter = new THREE.Vector3(zPos.x, this._tempOrigin.y, zPos.z);
+                if (!hasLoS(zombieCenter)) continue;
+
+                bestDot = dot;
+                bestDir = toZombie;
             }
 
             if (bestDir) {
-                // Snap shot direction
                 this._tempDir.set(bestDir.x, this._tempDir.y, bestDir.z).normalize();
-                // Rotate player to face the target
                 transform.rotation.y = Math.atan2(-bestDir.x, -bestDir.z);
                 const meshComp = player.components.MeshComponent;
                 if (meshComp && meshComp.mesh) meshComp.mesh.rotation.y = transform.rotation.y;
@@ -281,7 +296,7 @@ export class CombatSystem {
 
         this._tempEndPoint.copy(this._tempOrigin).add(this._tempDir.clone().multiplyScalar(100));
 
-        // Use object pooled line instead of new allocations
+        // Tracer line
         const positions = this.tracerLine.geometry.attributes.position.array;
         positions[0] = this._tempOrigin.x;
         positions[1] = this._tempOrigin.y;
@@ -291,20 +306,25 @@ export class CombatSystem {
         positions[5] = this._tempEndPoint.z;
         this.tracerLine.geometry.attributes.position.needsUpdate = true;
         this.tracerLine.visible = true;
-
         if (this.tracerTimeout) clearTimeout(this.tracerTimeout);
-        this.tracerTimeout = setTimeout(() => {
-            this.tracerLine.visible = false;
-        }, 50);
+        this.tracerTimeout = setTimeout(() => { this.tracerLine.visible = false; }, 50);
 
-        const zombies = entities.filter(e => e.components.ZombieTag && e.components.MeshComponent && (!e.components.AI || e.components.AI.state !== 'dead'));
+        // ── Bullet hit: zombies blocked by obstacles take no damage ────────
+        const zombies = entities.filter(e =>
+            e.components.ZombieTag &&
+            e.components.MeshComponent &&
+            (!e.components.AI || e.components.AI.state !== 'dead')
+        );
         const zombieMeshes = zombies.map(e => e.components.MeshComponent.mesh);
 
+        // Raycast vs obstacles first to find blocking distance
+        const obsHits = this.raycaster.intersectObjects(obstacleMeshes, false);
+        const obsBlockDist = obsHits.length > 0 ? obsHits[0].distance : Infinity;
+
         const intersects = this.raycaster.intersectObjects(zombieMeshes);
-        if (intersects.length > 0) {
+        if (intersects.length > 0 && intersects[0].distance < obsBlockDist) {
             const hitObject = intersects[0].object;
             const hitEntity = zombies.find(e => e.components.MeshComponent.mesh === hitObject);
-
             if (hitEntity && hitEntity.components.Health) {
                 console.log("Hit Zombie!");
                 this.damageEntity(hitEntity, 1);
@@ -344,6 +364,21 @@ export class CombatSystem {
 
             if (health.current <= 0) {
                 this.killEntity(entity);
+            } else {
+                // ── Random stagger / knockdown ────────────────────────────
+                const ai = entity.components.AI;
+                if (ai && ai.state !== 'knocked_down' && ai.state !== 'dead' && Math.random() < 0.35) {
+                    ai.state = 'knocked_down';
+                    // Random floor time: 1.0 – 2.5 seconds
+                    ai.knockDownTimer = 1.0 + Math.random() * 1.5;
+
+                    // Tilt mesh forward to show the fall
+                    const meshComp = entity.components.MeshComponent;
+                    if (meshComp && meshComp.mesh) {
+                        meshComp.mesh.rotation.x = Math.PI / 2;
+                    }
+                }
+                // ─────────────────────────────────────────────────────────
             }
         }
     }

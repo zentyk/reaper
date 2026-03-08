@@ -278,7 +278,7 @@ export class LevelManager {
             new Movement(0.08, 0.04), // Movement speed
             new Collider(0.3),
             new Inventory(),
-            new Weapon(15, currentAmmo)
+            new Weapon(currentAmmo, 15)
         ]);
 
         entity.rigidBody = rigidBody;

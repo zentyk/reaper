@@ -51,11 +51,16 @@ export class AISystem {
         const meshComp = entity.components.MeshComponent;
         const rigidBody = entity.rigidBody;
 
+        // Lazily initialise stuck-detection state
+        if (!ai._lastPos) ai._lastPos = transform.position.clone();
+        if (ai.stuckTimer === undefined) ai.stuckTimer = 0;
+        if (ai.nudgeTimer === undefined) ai.nudgeTimer = 0;
+
         // Handle Knockdown
         if (ai.state === 'knocked_down') {
             ai.knockDownTimer -= dt;
             if (ai.knockDownTimer <= 0) {
-                ai.state = 'chase'; // Stand up
+                ai.state = 'chase';
 
                 // Reset Transform
                 transform.rotation.x = 0;
@@ -144,8 +149,31 @@ export class AISystem {
 
             // Axis-independent movement — scale speed by difficulty
             const speedMult = store.difficulty === 'hard' ? 1.6 : 1.0;
-            const dx = this._tempDir.x * movement.speed * speedMult;
-            const dz = this._tempDir.z * movement.speed * speedMult;
+            let dx = this._tempDir.x * movement.speed * speedMult;
+            let dz = this._tempDir.z * movement.speed * speedMult;
+
+            // ── Stuck detection & escape nudge ───────────────────────────
+            const movedDist = transform.position.distanceTo(ai._lastPos);
+            if (movedDist < 0.002) {           // hasn't moved meaningfully
+                ai.stuckTimer += dt;
+            } else {
+                ai.stuckTimer = 0;
+            }
+            ai._lastPos.copy(transform.position);
+
+            if (ai.stuckTimer > 0.4) {
+                // Apply a random perpendicular nudge to unstick
+                ai.stuckTimer = 0;
+                ai.pathTimer = pathRefreshRate; // force path recalc next frame
+
+                const perpAngle = Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2;
+                const cos = Math.cos(perpAngle);
+                const sin = Math.sin(perpAngle);
+                const nudgeStr = movement.speed * speedMult * 3;
+                dx = (this._tempDir.x * cos - this._tempDir.z * sin) * nudgeStr;
+                dz = (this._tempDir.x * sin + this._tempDir.z * cos) * nudgeStr;
+            }
+            // ─────────────────────────────────────────────────────────────
 
             if (this.characterController && rigidBody) {
                 this._tempPos.set(dx, 0, dz);

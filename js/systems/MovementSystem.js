@@ -44,8 +44,9 @@ export class MovementSystem {
 
         // ── Quick Turn (Normal / Easy only) ─────────────────────────────
         if (store.difficulty !== 'hard') {
-            // Trigger new quick turn (not while being bitten)
-            if (input.quickTurn && !this._quickTurnActive && !(grapple && grapple.isGrappled)) {
+            // Trigger new quick turn (not while being bitten or reloading)
+            const weapon = entity.components.Weapon;
+            if (input.quickTurn && !this._quickTurnActive && !(grapple && grapple.isGrappled) && !(weapon && weapon.reloadTimer > 0)) {
                 this._quickTurnActive = true;
                 this._quickTurnProgress = 0;
                 this._quickTurnStart = transform.rotation.y;
@@ -73,7 +74,10 @@ export class MovementSystem {
 
         // Health-based speed/rotation penalty (100% hp → ×1.0, 0% hp → ×0.4)
         const health = entity.components.Health;
-        const healthFactor = health ? (0.4 + 0.6 * Math.max(0, health.current / health.max)) : 1.0;
+        const healthRatio = health ? Math.max(0, health.current / health.max) : 1.0;
+        // Quadratic curve: damage feels dramatic at mid-health, not just near death
+        // 100% HP → ×1.0 | 75% → ×0.65 | 50% → ×0.40 | 25% → ×0.25 | 0% → ×0.20
+        const healthFactor = 0.20 + 0.80 * (healthRatio * healthRatio);
 
         // Rotation — slows with damage
         const rotSpeed = movement.rotationSpeed * healthFactor;
