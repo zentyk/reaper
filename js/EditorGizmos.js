@@ -6,7 +6,7 @@ const COLORS = {
     zombie: 0xff2222,  // red
     collectible: 0x2288ff,  // blue
     light: 0xffffaa,   // bright yellow-white
-    cameraBounds: 0xffdd00, // matching camera color
+    cameraBounds: 0x0088ff, // Blue matching the reference
     selected: 0xffffff,  // white selection ring
 };
 
@@ -64,32 +64,32 @@ export class EditorGizmos {
         let mesh;
         if (type === 'cameraBounds') {
             const width = w || 1;
-            const height = h || 2; // Default volume height
             const depth = d || 1;
 
-            const group = new THREE.Group();
-
-            // 1. Semi-transparent core
-            const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-            const boxMat = new THREE.MeshBasicMaterial({
+            // 1. Plane core (Matching blue reference image)
+            const planeGeo = new THREE.PlaneGeometry(1, 1, 10, 10);
+            const planeMat = new THREE.MeshBasicMaterial({
                 color: COLORS[type],
                 transparent: true,
-                opacity: 0.1,
-                depthTest: true, // Allow seeing objects inside
-                depthWrite: false
+                opacity: 0.45,
+                depthTest: true,
+                depthWrite: false,
+                side: THREE.DoubleSide
             });
-            const box = new THREE.Mesh(boxGeo, boxMat);
+            const plane = new THREE.Mesh(planeGeo, planeMat);
 
-            // 2. Wireframe outline
-            const edges = new THREE.EdgesGeometry(boxGeo);
-            const lineMat = new THREE.LineBasicMaterial({ color: COLORS[type], transparent: true, opacity: 0.5 });
+            // 2. Wireframe/Grid outline
+            const edges = new THREE.EdgesGeometry(planeGeo);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
             const wireframe = new THREE.LineSegments(edges, lineMat);
 
-            group.add(box);
+            const group = new THREE.Group();
+            group.add(plane);
             group.add(wireframe);
 
-            group.position.set(x, y + height / 2 + 0.01, z); // Center vertically and slight lift
-            group.scale.set(width, height, depth);
+            group.rotation.x = -Math.PI / 2;
+            group.position.set(x, 0.05, z); // Slightly above floor
+            group.scale.set(width, depth, 1);
 
             mesh = group;
         } else {
@@ -140,8 +140,7 @@ export class EditorGizmos {
                 window.game.transformControl.detach();
             }
             this.scene.remove(mesh);
-            mesh.geometry.dispose();
-            mesh.material.dispose();
+            this._dispose(mesh);
         });
 
         this.gizmos = this.gizmos.filter(g => g.id !== id);
@@ -155,8 +154,7 @@ export class EditorGizmos {
                 window.game.transformControl.detach();
             }
             this.scene.remove(mesh);
-            mesh.geometry.dispose();
-            mesh.material.dispose();
+            this._dispose(mesh);
         });
         this.gizmos = this.gizmos.filter(g => g.type !== type);
     }
@@ -239,8 +237,7 @@ export class EditorGizmos {
 
         for (const g of this.gizmos) {
             this.scene.remove(g.mesh);
-            g.mesh.geometry.dispose();
-            g.mesh.material.dispose();
+            this._dispose(g.mesh);
         }
         this.gizmos = [];
         if (this._ringMesh) {
@@ -250,5 +247,20 @@ export class EditorGizmos {
             this._ringMesh = null;
         }
         this.selectedId = null;
+    }
+
+    _dispose(node) {
+        if (node.geometry) node.geometry.dispose();
+        if (node.material) {
+            if (Array.isArray(node.material)) {
+                node.material.forEach(m => m.dispose());
+            } else {
+                node.material.dispose();
+            }
+        }
+        if (node.children) {
+            // Must clone children array because dispose might remove them
+            [...node.children].forEach(c => this._dispose(c));
+        }
     }
 }

@@ -208,14 +208,12 @@ watch([() => store.editorSelectedId, showBoundsGizmo], ([id, show]) => {
       const cx = (b.minX + b.maxX) / 2;
       const cz = (b.minZ + b.maxZ) / 2;
       
-      const h = 2.0;
-      
-      // Add the bounds gizmo. Use 'cameraBounds' as both type and ID (single instance)
-      game.editorGizmos.addGizmo('cameraBounds', id, cx, 0, cz, w, h, d);
-      // Ensure it has the data correctly scaled
+      // Add the bounds gizmo as a flat plane
+      game.editorGizmos.addGizmo('cameraBounds', id, cx, 0, cz, w, 0.1, d);
+      // Ensure it has the data correctly scaled (local Y is world depth for the rotated plane)
       const mesh = game.editorGizmos.gizmos.find(g => g.type === 'cameraBounds')?.mesh;
       if (mesh) {
-        mesh.scale.set(w, h, d);
+        mesh.scale.set(w, d, 1);
       }
     }
   }
@@ -302,7 +300,34 @@ function updateLookAt(idx, value) {
   if (selectedData.value?.lookAt) selectedData.value.lookAt[idx] = value;
 }
 function updateBound(key, value) {
-  if (selectedData.value?.bounds) selectedData.value.bounds[key] = value;
+  if (selectedData.value?.bounds) {
+    selectedData.value.bounds[key] = value;
+    applyBoundsUpdate();
+  }
+}
+
+function applyBoundsUpdate() {
+  const game = window.game;
+  const d = selectedData.value;
+  if (!game || !game.editorGizmos || !d || !d.bounds) return;
+
+  const b = d.bounds;
+  const w = b.maxX - b.minX;
+  const d_val = b.maxZ - b.minZ;
+  const cx = (b.minX + b.maxX) / 2;
+  const cz = (b.minZ + b.maxZ) / 2;
+
+  // Sync the existing cameraBounds gizmo
+  const gizmo = game.editorGizmos.gizmos.find(g => g.type === 'cameraBounds');
+  if (gizmo && gizmo.mesh) {
+    gizmo.mesh.position.set(cx, 0.05, cz);
+    gizmo.mesh.scale.set(w, d_val, 1);
+    
+    // Also sync selection ring if this is the active transform object
+    if (game.transformControl.object === gizmo.mesh && game.editorGizmos._ringMesh) {
+      game.editorGizmos._ringMesh.position.copy(gizmo.mesh.position);
+    }
+  }
 }
 function handleLightColorChange(hexString) {
   const cleanHex = hexString.replace('#', '');

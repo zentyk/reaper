@@ -192,7 +192,7 @@ export class Game {
                     const cam = this.currentLevelData.cameras.find(c => c.id === id);
                     if (cam) {
                         const w = mesh.scale.x;
-                        const d = mesh.scale.z;
+                        const d = mesh.scale.y; // Plane is rotated, so local Y is world Z
                         cam.bounds.minX = pos.x - w / 2;
                         cam.bounds.maxX = pos.x + w / 2;
                         cam.bounds.minZ = pos.z - d / 2;
@@ -210,8 +210,9 @@ export class Game {
                     const transform = entity.components.Transform;
                     if (transform) {
                         // Keep the entity's Y offset based on type
-                        const yOffset = type === 'zombie' ? 0.5 : (type === 'collectible' ? 0.3 : (type === 'playerSpawn' ? 1.0 : (type === 'cameraBounds' ? 1.0 : 0)));
-                        transform.position.set(pos.x, pos.y - yOffset, pos.z);
+                        const yOffset = type === 'zombie' ? 0.5 : (type === 'collectible' ? 0.3 : (type === 'playerSpawn' ? 1.0 : 0));
+                        const finalY = (type === 'cameraBounds') ? 0.05 : (pos.y - yOffset);
+                        transform.position.set(pos.x, finalY, pos.z);
                         if (entity.rigidBody) {
                             entity.rigidBody.setTranslation({ x: pos.x, y: pos.y - yOffset, z: pos.z }, true);
                         }
