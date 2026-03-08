@@ -1,5 +1,6 @@
 import { Transform, AI, ZombieTag, PlayerTag, Movement, MeshComponent, Grapple, ObstacleTag, Collider } from '../components.js';
 import * as THREE from 'three';
+import { store } from '../../src/store.js';
 
 export class AISystem {
     constructor(pathfinder) {
@@ -101,13 +102,15 @@ export class AISystem {
 
         // Simple state machine
         if (ai.state === 'idle') {
-            if (transform.position.distanceTo(targetPos) < 10) {
+            const detectRange = store.difficulty === 'hard' ? 20 : 10;
+            if (transform.position.distanceTo(targetPos) < detectRange) {
                 ai.state = 'chase';
             }
         } else if (ai.state === 'chase') {
             // Pathfinding update
             ai.pathTimer += dt;
-            if (ai.pathTimer > 0.5) {
+            const pathRefreshRate = store.difficulty === 'hard' ? 0.2 : 0.5;
+            if (ai.pathTimer > pathRefreshRate) {
                 ai.pathTimer = 0;
                 if (this.pathfinder) {
                     // Try to generate path
@@ -139,9 +142,10 @@ export class AISystem {
             this._tempDir.y = 0;
             this._tempDir.normalize();
 
-            // Axis-independent movement for sliding
-            const dx = this._tempDir.x * movement.speed;
-            const dz = this._tempDir.z * movement.speed;
+            // Axis-independent movement — scale speed by difficulty
+            const speedMult = store.difficulty === 'hard' ? 1.6 : 1.0;
+            const dx = this._tempDir.x * movement.speed * speedMult;
+            const dz = this._tempDir.z * movement.speed * speedMult;
 
             if (this.characterController && rigidBody) {
                 this._tempPos.set(dx, 0, dz);

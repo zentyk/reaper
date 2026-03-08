@@ -19,6 +19,7 @@ export const store = reactive({
     showColliders: false,
     showDebugMenu: false,
     instaKillCheat: false,
+    difficulty: 'normal',
     showLevelEditor: false,
     editorTool: 'select',
     editorLevel: 1,

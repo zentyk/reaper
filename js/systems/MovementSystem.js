@@ -1,5 +1,6 @@
 import { Transform, Movement, PlayerTag, Collider, ObstacleTag, InputState, Grapple } from '../components.js';
 import * as THREE from 'three';
+import { store } from '../../src/store.js';
 
 export class MovementSystem {
     constructor() {
@@ -9,14 +10,16 @@ export class MovementSystem {
         this._tempObsBox = new THREE.Box3();
         this._tempMin = new THREE.Vector3();
         this._tempMax = new THREE.Vector3();
+
+        // Quick Turn state
+        this._quickTurnActive = false;
+        this._quickTurnProgress = 0;  // 0 → 1
+        this._quickTurnStart = 0;     // starting rotation.y
+        this._quickTurnTarget = 0;    // target rotation.y
     }
 
     update(entities, dt) {
-        // Initialize character controller if it doesn't exist
-        if (!this.game) {
-            // Find game instance (dirty hack but works for this architecture)
-            this.game = window.game;
-        }
+        if (!this.game) this.game = window.game;
 
         if (this.game && this.game.physicsWorld && !this.characterController) {
             this.characterController = this.game.physicsWorld.createCharacterController(0.01);
@@ -26,12 +29,12 @@ export class MovementSystem {
 
         for (const entity of entities) {
             if (entity.components.PlayerTag && entity.components.Transform && entity.components.Movement && entity.components.InputState) {
-                this.handlePlayerMovement(entity);
+                this.handlePlayerMovement(entity, dt);
             }
         }
     }
 
-    handlePlayerMovement(entity) {
+    handlePlayerMovement(entity, dt = 0.016) {
         const transform = entity.components.Transform;
         const movement = entity.components.Movement;
         const input = entity.components.InputState;
@@ -39,21 +42,49 @@ export class MovementSystem {
         const grapple = entity.components.Grapple;
         const rigidBody = entity.rigidBody;
 
+        // ── Quick Turn (Normal / Easy only) ─────────────────────────────
+        if (store.difficulty !== 'hard') {
+            // Trigger new quick turn (not while being bitten)
+            if (input.quickTurn && !this._quickTurnActive && !(grapple && grapple.isGrappled)) {
+                this._quickTurnActive = true;
+                this._quickTurnProgress = 0;
+                this._quickTurnStart = transform.rotation.y;
+                this._quickTurnTarget = transform.rotation.y + Math.PI;
+            }
+
+            // Animate ongoing quick turn
+            if (this._quickTurnActive) {
+                const TURN_SPEED = 8; // Complete in ~0.125s
+                this._quickTurnProgress = Math.min(1, this._quickTurnProgress + dt * TURN_SPEED);
+                // Smooth ease-out
+                const ease = 1 - Math.pow(1 - this._quickTurnProgress, 3);
+                transform.rotation.y = this._quickTurnStart + ease * Math.PI;
+                if (meshComp && meshComp.mesh) meshComp.mesh.rotation.y = transform.rotation.y;
+                if (this._quickTurnProgress >= 1) this._quickTurnActive = false;
+                return; // Skip all other movement while turning
+            }
+        }
+
         // Don't move if aiming, grappled, or reloading
         if (input.aim) return;
         if (grapple && grapple.isGrappled) return;
         const weapon = entity.components.Weapon;
         if (weapon && weapon.reloadTimer > 0) return;
 
-        // Rotation
-        if (input.left) transform.rotation.y += movement.rotationSpeed;
-        if (input.right) transform.rotation.y -= movement.rotationSpeed;
+        // Health-based speed/rotation penalty (100% hp → ×1.0, 0% hp → ×0.4)
+        const health = entity.components.Health;
+        const healthFactor = health ? (0.4 + 0.6 * Math.max(0, health.current / health.max)) : 1.0;
+
+        // Rotation — slows with damage
+        const rotSpeed = movement.rotationSpeed * healthFactor;
+        if (input.left) transform.rotation.y += rotSpeed;
+        if (input.right) transform.rotation.y -= rotSpeed;
 
         // Position
         let dx = 0;
         let dz = 0;
 
-        const speed = input.run ? movement.speed * 2 : movement.speed;
+        const speed = (input.run ? movement.speed * 2 : movement.speed) * healthFactor;
 
         if (input.forward) {
             dx -= Math.sin(transform.rotation.y) * speed;

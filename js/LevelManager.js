@@ -307,11 +307,12 @@ export class LevelManager {
         const colliderDesc = RAPIER.ColliderDesc.capsule(0.6, 0.25);
         this.game.physicsWorld.createCollider(colliderDesc, rigidBody);
 
+        const maxHp = store.difficulty === 'hard' ? 6 : 3;
         const entity = this.createEntity([
             new Transform(x, 0.9, z),
             new MeshComponent(mesh),
             new ZombieTag(),
-            new Health(3, 3),
+            new Health(maxHp, maxHp),
             new Movement(0.03, 0.0),
             new AI(),
             new Collider(0.3)

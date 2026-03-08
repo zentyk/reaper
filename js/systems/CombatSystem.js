@@ -232,9 +232,54 @@ export class CombatSystem {
         this._tempOrigin.copy(transform.position);
         this._tempOrigin.y += 1.4;
 
+        // ── Auto-aim (Normal / Easy only) ────────────────────────────────
+        if (store.difficulty !== 'hard') {
+            const AUTO_AIM_RANGE = 15;          // max distance
+            const AUTO_AIM_CONE = Math.cos(Math.PI / 4); // 45° half-angle dot threshold
+
+            let bestDot = AUTO_AIM_CONE;
+            let bestDir = null;
+
+            const liveZombies = entities.filter(e =>
+                e.components.ZombieTag &&
+                e.components.Transform &&
+                (!e.components.AI || e.components.AI.state !== 'dead')
+            );
+
+            for (const zombie of liveZombies) {
+                const zPos = zombie.components.Transform.position;
+                const toZombie = new THREE.Vector3(
+                    zPos.x - this._tempOrigin.x,
+                    0,
+                    zPos.z - this._tempOrigin.z
+                );
+                const dist = toZombie.length();
+                if (dist > AUTO_AIM_RANGE || dist === 0) continue;
+
+                toZombie.normalize();
+                const flatDir = this._tempDir.clone().setY(0).normalize();
+                const dot = flatDir.dot(toZombie);
+
+                if (dot > bestDot) {
+                    bestDot = dot;
+                    bestDir = toZombie;
+                }
+            }
+
+            if (bestDir) {
+                // Snap shot direction
+                this._tempDir.set(bestDir.x, this._tempDir.y, bestDir.z).normalize();
+                // Rotate player to face the target
+                transform.rotation.y = Math.atan2(-bestDir.x, -bestDir.z);
+                const meshComp = player.components.MeshComponent;
+                if (meshComp && meshComp.mesh) meshComp.mesh.rotation.y = transform.rotation.y;
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────
+
         this.raycaster.set(this._tempOrigin, this._tempDir);
 
-        this._tempEndPoint.copy(this._tempOrigin).add(this._tempDir.multiplyScalar(100));
+        this._tempEndPoint.copy(this._tempOrigin).add(this._tempDir.clone().multiplyScalar(100));
 
         // Use object pooled line instead of new allocations
         const positions = this.tracerLine.geometry.attributes.position.array;
@@ -521,7 +566,8 @@ export class CombatSystem {
                         if (mesh.material) mesh.material.color.setHex(0xff00ff);
                     }
 
-                    this.damageEntity(player, 10);
+                    const biteDamage = store.difficulty === 'hard' ? 30 : 10;
+                    this.damageEntity(player, biteDamage);
                     return;
                 }
             }
