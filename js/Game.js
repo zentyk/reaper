@@ -169,9 +169,12 @@ export class Game {
                     if (this.cameras && this.cameras[this.currentLevelIndex]) {
                         const camObj = this.cameras[this.currentLevelIndex].find(c => c.camera.userData.id === id);
                         if (camObj) {
-                            camObj.camera.position.set(pos.x, pos.y, pos.z);
+                            camObj.camera.position.copy(pos);
                             camObj.pos = [pos.x, pos.y, pos.z];
-                            if (mesh.rotation) camObj.camera.rotation.copy(mesh.rotation);
+                            if (mesh.rotation) {
+                                camObj.camera.rotation.copy(mesh.rotation);
+                                camObj.rot = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
+                            }
                         }
                     }
                 } else if (type === 'light') {
@@ -184,6 +187,17 @@ export class Game {
                     syncItem(this.currentLevelData.zombies, 0.5);
                 } else if (type === 'collectible') {
                     syncItem(this.currentLevelData.collectibles, 0.3);
+                } else if (type === 'cameraBounds') {
+                    // Convert position + scale back into minX/maxX/minZ/maxZ
+                    const cam = this.currentLevelData.cameras.find(c => c.id === id);
+                    if (cam) {
+                        const w = mesh.scale.x;
+                        const d = mesh.scale.z;
+                        cam.bounds.minX = pos.x - w / 2;
+                        cam.bounds.maxX = pos.x + w / 2;
+                        cam.bounds.minZ = pos.z - d / 2;
+                        cam.bounds.maxZ = pos.z + d / 2;
+                    }
                 }
 
                 // Sync the actual game ECS entity in realtime so the visual model moves
@@ -196,7 +210,7 @@ export class Game {
                     const transform = entity.components.Transform;
                     if (transform) {
                         // Keep the entity's Y offset based on type
-                        const yOffset = type === 'zombie' ? 0.5 : (type === 'collectible' ? 0.3 : 0);
+                        const yOffset = type === 'zombie' ? 0.5 : (type === 'collectible' ? 0.3 : (type === 'playerSpawn' ? 1.0 : (type === 'cameraBounds' ? 1.0 : 0)));
                         transform.position.set(pos.x, pos.y - yOffset, pos.z);
                         if (entity.rigidBody) {
                             entity.rigidBody.setTranslation({ x: pos.x, y: pos.y - yOffset, z: pos.z }, true);
@@ -304,14 +318,16 @@ export class Game {
         this.raycaster.setFromCamera(this.mouse, this.editorCamera);
 
         // 1. Check if clicking an existing gizmo
-        const hitId = this.editorGizmos.raycast(this.raycaster);
+        const hit = this.editorGizmos.raycast(this.raycaster);
+        const hitId = hit ? hit.id : null;
+        const hitType = hit ? hit.type : null;
 
         if (store.editorTool === 'select') {
             store.editorSelectedId = hitId;
-            this.editorGizmos.setSelected(hitId);
+            this.editorGizmos.setSelected(hitId, hitType);
 
             if (hitId) {
-                const g = this.editorGizmos.gizmos.find(x => x.id === hitId);
+                const g = this.editorGizmos.gizmos.find(x => x.id === hitId && (hitType ? x.type === hitType : true));
                 if (g && g.mesh) {
                     this.transformControl.attach(g.mesh);
                 }
@@ -688,11 +704,18 @@ export class Game {
 
                         if (entity && entity.components.Transform) {
                             const tPos = entity.components.Transform.position;
-                            const yOffset = g.type === 'zombie' ? 0.5 : (g.type === 'collectible' ? 0.3 : 0);
+                            const yOffset = g.type === 'zombie' ? 0.5 : (g.type === 'collectible' ? 0.3 : (g.type === 'playerSpawn' ? 1.0 : 0));
                             g.mesh.position.set(tPos.x, tPos.y + yOffset, tPos.z);
 
                             if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
                                 this.editorGizmos._ringMesh.position.copy(g.mesh.position);
+                            }
+
+                            // Also force-sync the visual mesh (the white block character) so it's not left behind while paused
+                            const meshComp = entity.components.MeshComponent;
+                            if (meshComp && meshComp.mesh) {
+                                meshComp.mesh.position.copy(entity.components.Transform.position);
+                                meshComp.mesh.rotation.copy(entity.components.Transform.rotation);
                             }
                         }
                     }

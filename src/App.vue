@@ -120,7 +120,7 @@ function placeObject(tool, pos, game) {
     d.playerSpawn = { x, y: 0, z };
     game.editorGizmos?.moveById('playerSpawn', x, 1, z);
   } else if (tool === 'camera') {
-    const newCam = { id: uid, pos: [x, 10, z], lookAt: [0, 0, 0], bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 } };
+    const newCam = { id: uid, pos: [x, 10, z], rot: [0, 0, 0], lookAt: [0, 0, 0], bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 } };
     d.cameras.push(newCam);
     game.editorGizmos?.addGizmo('camera', uid, x, 10, z);
 
@@ -128,10 +128,10 @@ function placeObject(tool, pos, game) {
     const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     cam.userData.id = uid;
     cam.position.set(x, 10, z);
-    cam.lookAt(0, 0, 0); // Default look-at
+    cam.rotation.set(0, 0, 0); // Default rot
     if (!game.cameras[game.currentLevelIndex]) game.cameras[game.currentLevelIndex] = [];
     game.cameras[game.currentLevelIndex].push({
-        camera: cam, pos: newCam.pos, lookAt: newCam.lookAt, bounds: newCam.bounds
+        camera: cam, pos: newCam.pos, rot: newCam.rot, lookAt: newCam.lookAt, bounds: newCam.bounds
     });
   } else if (tool === 'zombie') {
     d.zombies.push({ id: uid, pos: [x, 0, z] });

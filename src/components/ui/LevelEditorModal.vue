@@ -75,6 +75,10 @@
             <input type="number" step="1" :value="selectedData.bounds[bk]"
               @change="updateBound(bk, +$event.target.value)" />
           </div>
+          <div class="inspector-field" style="margin-top:5px">
+            <label>Visual Gizmo</label>
+            <input type="checkbox" v-model="showBoundsGizmo" />
+          </div>
         </template>
         <!-- Light extras -->
         <template v-if="selected.type === 'light'">
@@ -129,8 +133,10 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue';
+import { computed, watch, ref } from 'vue';
 import { store } from '../../store.js';
+
+const showBoundsGizmo = ref(true);
 
 // ─── Tools ───────────────────────────────────────────────────────────
 const tools = [
@@ -155,9 +161,11 @@ const allObjects = computed(() => {
     list.push({ id: 'playerSpawn', type: 'playerSpawn', pos: [data.playerSpawn.x, data.playerSpawn.y, data.playerSpawn.z] });
   }
   (data.cameras || []).forEach(c => list.push({ id: c.id, type: 'camera', data: c, pos: c.pos }));
-  (data.zombies || []).forEach(z => list.push({ id: z.id, type: 'zombie', data: z, pos: z.pos }));
-  (data.collectibles || []).forEach(it => list.push({ id: it.id, type: 'collectible', data: it, pos: it.pos }));
-  (data.lights || []).forEach(l => list.push({ id: l.id, type: 'light', data: l, pos: l.pos }));
+  (data.zombies || []).forEach(z => list.push({ id: z.id, type: 'zombie', data: z, pos: z.pos, rot: z.rot }));
+  (data.collectibles || []).forEach(it => list.push({ id: it.id, type: 'collectible', data: it, pos: it.pos, rot: it.rot }));
+  (data.lights || []).forEach(l => list.push({ id: l.id, type: 'light', data: l, pos: l.pos, rot: l.rot }));
+  (data.obstacles || []).forEach(o => list.push({ id: o.id, type: 'obstacle', data: o, pos: [o.pos[0], 0, o.pos[2]], size: o.size }));
+  (data.doors || []).forEach(d => list.push({ id: d.id, type: 'door', data: d, pos: d.pos, size: d.size }));
 
   return list;
 });
@@ -182,8 +190,35 @@ function setGizmoMode(mode) {
   }
 }
 
-watch(() => store.editorSelectedId, id => {
-  window.game?.editorGizmos?.setSelected(id || null);
+watch([() => store.editorSelectedId, showBoundsGizmo], ([id, show]) => {
+  const game = window.game;
+  if (!game || !game.editorGizmos) return;
+
+  // Clear existing bounds gizmo first
+  game.editorGizmos.removeByType('cameraBounds');
+
+  game.editorGizmos.setSelected(id || null);
+
+  if (id && show) {
+    const obj = allObjects.value.find(o => o.id === id);
+    if (obj && obj.type === 'camera' && obj.data.bounds) {
+      const b = obj.data.bounds;
+      const w = b.maxX - b.minX;
+      const d = b.maxZ - b.minZ;
+      const cx = (b.minX + b.maxX) / 2;
+      const cz = (b.minZ + b.maxZ) / 2;
+      
+      const h = 2.0;
+      
+      // Add the bounds gizmo. Use 'cameraBounds' as both type and ID (single instance)
+      game.editorGizmos.addGizmo('cameraBounds', id, cx, 0, cz, w, h, d);
+      // Ensure it has the data correctly scaled
+      const mesh = game.editorGizmos.gizmos.find(g => g.type === 'cameraBounds')?.mesh;
+      if (mesh) {
+        mesh.scale.set(w, h, d);
+      }
+    }
+  }
 });
 
 // ─── Position fields ──────────────────────────────────────────────────
@@ -237,8 +272,23 @@ function setField(key, value) {
   }
 
   if (isRot) {
-    if (!sel.rot) sel.rot = [0,0,0];
+    if (!sel.rot) {
+      sel.rot = [0,0,0];
+      // Note: Vue won't automatically track the new array if we don't assign it carefully, 
+      // but `sel.rot[axisIdx] = v` below mutations should work if it's already an array from JSON.
+      // If we just added it, we need to enforce reactivity if necessary, but modifying the object directly works 
+      // since `d.value` is the source of truth for export anyway.
+    }
     sel.rot[axisIdx] = v;
+
+    // Direct Sync for Camera Rotation
+    if (sel.type === 'camera') {
+       const camObj = window.game?.cameras[window.game?.currentLevelIndex]?.find(c => c.camera.userData.id === sel.id);
+       if (camObj) {
+           camObj.camera.rotation.set(sel.rot[0], sel.rot[1], sel.rot[2]);
+           camObj.rot = [...sel.rot];
+       }
+    }
   } else {
     sel.pos[axisIdx] = v;
     window.game?.editorGizmos?.moveById(sel.id, sel.pos[0], sel.pos[1], sel.pos[2]);
@@ -279,9 +329,70 @@ function applyLightUpdate() {
 function deleteSelected() {
   const sel = selected.value;
   if (!sel || sel.type === 'playerSpawn') return;
+  const game = window.game;
   const data = d.value;
-  const listKey = { camera: 'cameras', zombie: 'zombies', collectible: 'collectibles', light: 'lights' }[sel.type];
-  if (listKey) data[listKey] = data[listKey].filter(o => o.id !== sel.id);
+  const listKey = { 
+    camera: 'cameras', 
+    zombie: 'zombies', 
+    collectible: 'collectibles', 
+    light: 'lights',
+    obstacle: 'obstacles',
+    door: 'doors'
+  }[sel.type];
+  
+  if (listKey && data[listKey]) {
+    const idx = data[listKey].findIndex(o => o.id === sel.id);
+    if (idx !== -1) {
+      data[listKey].splice(idx, 1);
+      // Force store update for reactivity to ensure hierarchy list updates
+      store.editorLevelData = { ...data };
+    }
+  }
+
+  // --- Engine Cleanup ---
+  if (game) {
+    if (sel.type === 'camera') {
+      const idx = game.currentLevelIndex;
+      if (game.cameras[idx]) {
+        const camArr = game.cameras[idx];
+        const camIdx = camArr.findIndex(c => c.camera.userData.id === sel.id);
+        if (camIdx !== -1) {
+          const removed = camArr.splice(camIdx, 1)[0];
+          // If we deleted the active camera, switch to another one or default
+          if (game.activeCamera === removed.camera) {
+            if (camArr.length > 0) {
+              game.activeCamera = camArr[0].camera;
+            } else {
+              // Create a fallback if all cameras deleted
+              const fallback = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+              fallback.position.set(0, 10, 10);
+              fallback.lookAt(0,0,0);
+              game.activeCamera = fallback;
+            }
+          }
+        }
+      }
+    } else if (sel.type === 'zombie' || sel.type === 'collectible' || sel.type === 'obstacle' || sel.type === 'door') {
+      const entity = game.world.entities.find(e => e.persistentId === sel.id);
+      if (entity) {
+        if (entity.components.MeshComponent) {
+          game.scene.remove(entity.components.MeshComponent.mesh);
+        }
+        if (entity.rigidBody) {
+          game.physicsWorld.removeRigidBody(entity.rigidBody);
+        }
+        game.world.entities = game.world.entities.filter(e => e !== entity);
+        // Also remove from interactables if it's an item or door
+        game.interactables = game.interactables.filter(e => e !== entity);
+        // And obstacles array
+        game.obstacles = game.obstacles.filter(e => e !== entity);
+      }
+    } else if (sel.type === 'light') {
+      const light = game.scene.children.find(c => c.isPointLight && c.userData.id === sel.id);
+      if (light) game.scene.remove(light);
+    }
+  }
+
   window.game?.editorGizmos?.removeById(sel.id);
   store.editorSelectedId = null;
 }
@@ -331,12 +442,26 @@ function reloadLevel() {
   setTimeout(() => {
     store.editorLevelData = window.game?.currentLevelData || null;
     window.game?.editorGizmos?.sync(store.editorLevelData);
+    
+    // Re-trigger selection to restore bounds gizmo
+    const selId = store.editorSelectedId;
+    if (selId) {
+      store.editorSelectedId = null;
+      setTimeout(() => { store.editorSelectedId = selId; }, 10);
+    }
   }, 600);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 function typeColor(type) {
-  return { camera: '#ffdd00', playerSpawn: '#00cc44', zombie: '#ff2222', collectible: '#2288ff' }[type] || '#aaa';
+  return { 
+    camera: '#ffdd00', 
+    playerSpawn: '#00cc44', 
+    zombie: '#ff2222', 
+    collectible: '#2288ff',
+    obstacle: '#888',
+    door: '#8B4513'
+  }[type] || '#aaa';
 }
 function formatPos(obj) {
   const p = obj.pos;

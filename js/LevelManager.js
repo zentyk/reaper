@@ -43,7 +43,11 @@ export class LevelManager {
         if (targetCamConfig && this.game.activeCamera !== targetCamConfig.camera) {
             this.game.activeCamera = targetCamConfig.camera;
             this.game.activeCamera.position.set(...targetCamConfig.pos);
-            this.game.activeCamera.lookAt(...targetCamConfig.lookAt);
+            if (targetCamConfig.rot) {
+                this.game.activeCamera.rotation.set(...targetCamConfig.rot);
+            } else if (targetCamConfig.lookAt) {
+                this.game.activeCamera.lookAt(...targetCamConfig.lookAt);
+            }
         }
     }
 
@@ -162,7 +166,12 @@ export class LevelManager {
             this.game.cameras[this.currentLevel] = data.cameras.map(c => {
                 const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
                 cam.userData.id = c.id;
-                if (c.rot) cam.rotation.set(c.rot[0], c.rot[1], c.rot[2]);
+                cam.position.set(...c.pos);
+                if (c.rot) {
+                    cam.rotation.set(c.rot[0], c.rot[1], c.rot[2]);
+                } else if (c.lookAt) {
+                    cam.lookAt(...c.lookAt);
+                }
                 return { camera: cam, pos: c.pos, lookAt: c.lookAt, rot: c.rot, bounds: c.bounds };
             });
             this.game.activeCamera = this.game.cameras[this.currentLevel][0].camera;
@@ -215,6 +224,20 @@ export class LevelManager {
         if (data.collectibles) {
             data.collectibles.forEach(c => {
                 this.createCollectible(c.id, c.type || 'ammo', c.amount || 15, c.name || 'Item', c.pos[0], c.pos[1], c.pos[2], c.rot);
+            });
+        }
+
+        // Obstacles
+        if (data.obstacles) {
+            data.obstacles.forEach(o => {
+                this.createObstacle(o.id, o.pos[0], o.pos[2], o.size[0], o.size[2]);
+            });
+        }
+
+        // Doors
+        if (data.doors) {
+            data.doors.forEach(d => {
+                this.createDoor(d.id, d.pos[0], d.pos[1], d.pos[2], d.size[0], d.size[1], d.size[2], d.targetLevel, d.isLocked, d.requiredKeyId);
             });
         }
     }
