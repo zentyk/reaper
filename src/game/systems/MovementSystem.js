@@ -1,6 +1,6 @@
 import { Transform, Movement, PlayerTag, Collider, ObstacleTag, InputState, Grapple } from '../components.js';
 import * as THREE from 'three';
-import { store } from '../../src/store.js';
+import { store } from '../../store.js';
 
 export class MovementSystem {
     constructor() {

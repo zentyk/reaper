@@ -1,5 +1,5 @@
 import { PlayerTag, CollectibleTag, DoorTag, Transform } from '../components.js';
-import { Input } from '../core/Input.js';
+import { Input } from '../../engine/core/Input.js';
 
 export class InteractionSystem {
     constructor(game) {

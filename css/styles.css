@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Garamond&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
 :root {
     /* Base Colors Retained for HTML Canvas/Overlays */
     --color-bg-body: #000;
@@ -152,8 +154,6 @@ canvas {
 }
 
 /* --- Retro Inventory Overrides --- */
-@import url('https://fonts.googleapis.com/css2?family=Garamond&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
-
 .retro-inventory-overlay {
     position: fixed;
     top: 0;

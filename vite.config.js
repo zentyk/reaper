@@ -17,7 +17,7 @@ export default defineConfig({
                     req.on('end', () => {
                         try {
                             const { level, data } = JSON.parse(body);
-                            const filePath = resolve(__dirname, `js/levels/level${level}.json`);
+                            const filePath = resolve(__dirname, `src/game/levels/level${level}.json`);
                             writeFileSync(filePath, JSON.stringify(data, null, 2));
                             res.setHeader('Content-Type', 'application/json');
                             res.end(JSON.stringify({ ok: true }));

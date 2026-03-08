@@ -1,22 +1,21 @@
 import * as THREE from 'three';
-import { World } from './ecs/World.js';
+import { World } from '../engine/ecs/World.js';
 import { InputSystem } from './systems/InputSystem.js';
 import { MovementSystem } from './systems/MovementSystem.js';
 import { AISystem } from './systems/AISystem.js';
 import { CombatSystem } from './systems/CombatSystem.js';
 import { InteractionSystem } from './systems/InteractionSystem.js';
-import { UIManager } from './UIManager.js';
+import { UIManager } from './managers/UIManager.js';
 import { GameState } from './managers/GameState.js';
-import { LevelManager } from './LevelManager.js';
-import { Input } from './core/Input.js';
-import { AudioHandler } from './AudioHandler.js';
-import { Player } from './Player.js';
-import { EditorGizmos } from './EditorGizmos.js';
+import { LevelManager } from './levels/LevelManager.js';
+import { Input } from '../engine/core/Input.js';
+import { AudioHandler } from '../engine/audio/AudioHandler.js';
+import { Player } from './entities/Player.js';
+import { EditorCore } from '../editor/EditorCore.js';
 import RAPIER from '@dimforge/rapier3d-compat';
-import doorTextureUrl from '../img/door_texture.png?url';
-import { store } from '../src/store.js';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import doorTextureUrl from '../../img/door_texture.png?url';
+import { store } from '../store.js';
+
 
 export class Game {
     static async init() {
@@ -62,9 +61,6 @@ export class Game {
         this.levelManager = new LevelManager(this);
         this.input = new Input();
 
-        // --- Level Editor Core ---
-        this.raycaster = new THREE.Raycaster();
-        this.mouse = new THREE.Vector2();
 
         // --- Player Controller ---
         this.player = new Player(this.scene, this);
@@ -99,7 +95,6 @@ export class Game {
         this._setupTransitionScene();
 
         // --- Level Editor ---
-        this.editorGizmos = new EditorGizmos(this.scene);
         this.currentLevelData = null;
         this.currentLevelIndex = 1;
 
@@ -109,150 +104,10 @@ export class Game {
             if (lvl && this.levelManager) this.levelManager.loadLevel(lvl);
         });
 
-        // Transform Controls (Unity/UE5 Style Gizmos)
-        this.editorCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.editorCamera.position.set(0, 15, 15);
-        this.editorCamera.lookAt(0, 0, 0);
-
-        this.orbitControls = new OrbitControls(this.editorCamera, this.renderer.domElement);
-        this.orbitControls.enabled = false; // Disabled by default until editor opens
-
-        this.transformControl = new TransformControls(this.editorCamera, this.renderer.domElement);
-        this.isGizmoDragging = false;
-
-        this.transformControl.addEventListener('dragging-changed', (event) => {
-            this.isGizmoDragging = event.value;
-            // Disable orbit controls while dragging gizmo so we don't accidentally rotate the camera
-            this.orbitControls.enabled = !event.value;
-        });
-
-        this.transformControl.addEventListener('change', () => {
-            if (!this.transformControl.object) return;
-
-            const mesh = this.transformControl.object;
-
-            // Sync the red selection ring position with the mesh
-            if (this.editorGizmos && this.editorGizmos._ringMesh) {
-                this.editorGizmos._ringMesh.position.copy(mesh.position);
-            }
-
-            // Update Vue Store when dragging ends or during drag
-            if (this.isGizmoDragging && this.currentLevelData) {
-                const type = mesh.userData.editorType;
-                const id = mesh.userData.editorId;
-                const pos = mesh.position;
-
-                const syncItem = (list, yOffset = 0) => {
-                    if (!list) return;
-                    const it = list.find(i => i.id === id);
-                    if (it) {
-                        if (it.pos) {
-                            it.pos[0] = pos.x;
-                            it.pos[1] = pos.y - yOffset;
-                            it.pos[2] = pos.z;
-                        }
-                        if (mesh.rotation) {
-                            it.rot = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
-                        }
-                    }
-                };
-
-                if (type === 'playerSpawn') {
-                    this.currentLevelData.playerSpawn.x = pos.x;
-                    this.currentLevelData.playerSpawn.y = pos.y - 1.0;
-                    this.currentLevelData.playerSpawn.z = pos.z;
-                    if (mesh.rotation) {
-                        this.currentLevelData.playerSpawn.rot = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
-                    }
-                } else if (type === 'camera') {
-                    syncItem(this.currentLevelData.cameras, 0);
-                    if (this.cameras && this.cameras[this.currentLevelIndex]) {
-                        const camObj = this.cameras[this.currentLevelIndex].find(c => c.camera.userData.id === id);
-                        if (camObj) {
-                            camObj.camera.position.copy(pos);
-                            camObj.pos = [pos.x, pos.y, pos.z];
-                            if (mesh.rotation) {
-                                camObj.camera.rotation.copy(mesh.rotation);
-                                camObj.rot = [mesh.rotation.x, mesh.rotation.y, mesh.rotation.z];
-                            }
-                        }
-                    }
-                } else if (type === 'light') {
-                    syncItem(this.currentLevelData.lights, 0);
-                    const light = this.scene.children.find(c => c.isPointLight && c.userData.id === id);
-                    if (light) {
-                        light.position.copy(pos);
-                    }
-                } else if (type === 'zombie') {
-                    syncItem(this.currentLevelData.zombies, 0.5);
-                } else if (type === 'collectible') {
-                    syncItem(this.currentLevelData.collectibles, 0.3);
-                } else if (type === 'cameraBounds') {
-                    // Convert position + scale back into minX/maxX/minZ/maxZ
-                    const cam = this.currentLevelData.cameras.find(c => c.id === id);
-                    if (cam) {
-                        const w = mesh.scale.x;
-                        const d = mesh.scale.y; // Plane is rotated, so local Y is world Z
-                        cam.bounds.minX = pos.x - w / 2;
-                        cam.bounds.maxX = pos.x + w / 2;
-                        cam.bounds.minZ = pos.z - d / 2;
-                        cam.bounds.maxZ = pos.z + d / 2;
-                    }
-                }
-
-                // Sync the actual game ECS entity in realtime so the visual model moves
-                let entity = this.world.entities.find(e => e.persistentId === id);
-                if (!entity && id === 'playerSpawn') {
-                    entity = this.playerEntity;
-                }
-
-                if (entity) {
-                    const transform = entity.components.Transform;
-                    if (transform) {
-                        // Keep the entity's Y offset based on type
-                        const yOffset = type === 'zombie' ? 0.5 : (type === 'collectible' ? 0.3 : (type === 'playerSpawn' ? 1.0 : 0));
-                        const finalY = (type === 'cameraBounds') ? 0.05 : (pos.y - yOffset);
-                        transform.position.set(pos.x, finalY, pos.z);
-                        if (entity.rigidBody) {
-                            entity.rigidBody.setTranslation({ x: pos.x, y: pos.y - yOffset, z: pos.z }, true);
-                        }
-
-                        // For rotations
-                        if (mesh.rotation) {
-                            transform.rotation.copy(mesh.rotation);
-                        }
-
-                        // Immediately sync the visual mesh component instead of waiting for physics step
-                        const meshComp = entity.components.MeshComponent;
-                        if (meshComp && meshComp.mesh) {
-                            meshComp.mesh.position.copy(transform.position);
-                            meshComp.mesh.rotation.copy(transform.rotation);
-                            meshComp.mesh.scale.copy(mesh.scale);
-                        }
-                    }
-                }
-
-                // Update specific selected pos in store for UI reactivity
-                store.editorLevelData = { ...this.currentLevelData };
-            }
-        });
-
-        this.scene.add(this.transformControl);
-
-        // Editor Viewport Interaction
-        window.addEventListener('pointerdown', (e) => this._onEditorClick(e));
-
-        // Editor Hotkeys (W, E, R for Translate, Rotate, Scale)
-        window.addEventListener('keydown', (e) => {
-            if (!store.showLevelEditor) return;
-            switch (e.key.toLowerCase()) {
-                case 'w': this.transformControl.setMode('translate'); break;
-                case 'e': this.transformControl.setMode('rotate'); break;
-                case 'r': this.transformControl.setMode('scale'); break;
-                case 'u': // Also allow 'T' or 'U' if desired, but W/E/R is standard Unity/UE
-                    break;
-            }
-        });
+        this.editorCore = new EditorCore(this);
+        // Expose editorGizmos and transformControl as aliases so UI components can still access them without massive refactoring yet
+        Object.defineProperty(this, 'editorGizmos', { get: () => this.editorCore.editorGizmos });
+        Object.defineProperty(this, 'transformControl', { get: () => this.editorCore.transformControl });
     }
 
     toggleColliderVisuals(show) {
@@ -301,106 +156,6 @@ export class Game {
 
     _bindUICallbacks() {
         this.ui.callbacks.onStart = () => this.startGame();
-    }
-
-    _onEditorClick(event) {
-        if (!store.showLevelEditor) return;
-        if (this.isGizmoDragging) return; // Prevent raycasting if currently using the transform gizmo
-
-        // Ignore clicks on UI elements (which should prevent propagation, but just in case)
-        if (event.target.closest('.editor-sidebar')) return;
-
-        // Calculate normalized device coordinates
-        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-        // Ensure TransformControls is using the correct camera
-        this.transformControl.camera = this.editorCamera;
-        this.raycaster.setFromCamera(this.mouse, this.editorCamera);
-
-        // 1. Check if clicking an existing gizmo
-        const hit = this.editorGizmos.raycast(this.raycaster);
-        const hitId = hit ? hit.id : null;
-        const hitType = hit ? hit.type : null;
-
-        if (store.editorTool === 'select') {
-            store.editorSelectedId = hitId;
-            this.editorGizmos.setSelected(hitId, hitType);
-
-            if (hitId) {
-                const g = this.editorGizmos.gizmos.find(x => x.id === hitId && (hitType ? x.type === hitType : true));
-                if (g && g.mesh) {
-                    this.transformControl.attach(g.mesh);
-                }
-            } else {
-                this.transformControl.detach();
-            }
-            return;
-        }
-
-        // 2. If placing a new object, find intersection with the floor
-        if (this.levelManager.commonFloorMesh) {
-            const intersects = this.raycaster.intersectObject(this.levelManager.commonFloorMesh);
-            if (intersects.length > 0) {
-                const p = intersects[0].point;
-                this._placeEditorObject(store.editorTool, p.x, p.y, p.z);
-            }
-        }
-    }
-
-    _placeEditorObject(type, x, y, z) {
-        if (!this.currentLevelData) return;
-
-        const id = `${type}_${Date.now()}`;
-        let newObj = null;
-
-        if (type === 'playerSpawn') {
-            // Only one player spawn allowed, so we replace it
-            this.currentLevelData.playerSpawn = { x, y, z };
-            newObj = { id: 'playerSpawn', pos: [x, y, z] };
-        } else if (type === 'camera') {
-            if (!this.currentLevelData.cameras) this.currentLevelData.cameras = [];
-            newObj = { id, pos: [x, y + 10, z], lookAt: [x, 0, z], bounds: { minX: x - 5, maxX: x + 5, minZ: z - 5, maxZ: z + 5 } };
-            this.currentLevelData.cameras.push(newObj);
-        } else if (type === 'zombie') {
-            if (!this.currentLevelData.zombies) this.currentLevelData.zombies = [];
-            newObj = { id, pos: [x, y, z] };
-            this.currentLevelData.zombies.push(newObj);
-        } else if (type === 'collectible') {
-            if (!this.currentLevelData.collectibles) this.currentLevelData.collectibles = [];
-            newObj = { id, type: 'ammo', name: 'Handgun Ammo', amount: 15, pos: [x, y, z] };
-            this.currentLevelData.collectibles.push(newObj);
-        } else if (type === 'light') {
-            if (!this.currentLevelData.lights) this.currentLevelData.lights = [];
-            newObj = { id, pos: [x, y + 2, z], color: 16768426, intensity: 5, distance: 10 }; // default warm white
-            this.currentLevelData.lights.push(newObj);
-
-            // Spawn physical pointlight immediately
-            const pLight = new THREE.PointLight(newObj.color, newObj.intensity, newObj.distance);
-            pLight.position.set(x, y + 2, z);
-            pLight.userData.id = id;
-            this.scene.add(pLight);
-        }
-
-        // Sync Vue store to force UI update
-        store.editorLevelData = { ...this.currentLevelData };
-
-        // Ensure the visual gizmo is spawned
-        if (type === 'playerSpawn') {
-            // Remove old spawn point visually if it existed
-            this.editorGizmos.removeById('playerSpawn');
-            this.editorGizmos.addGizmo('playerSpawn', 'playerSpawn', x, y + 1, z);
-        } else {
-            let yOffset = 0;
-            if (type === 'zombie') yOffset = 0.5;
-            if (type === 'collectible') yOffset = 0.3;
-            // lights and cameras stay at pos
-            this.editorGizmos.addGizmo(type, id, newObj.pos[0], newObj.pos[1] + yOffset, newObj.pos[2]);
-        }
-
-        // Auto-select the newly placed object
-        store.editorSelectedId = newObj.id;
-        this.editorGizmos.setSelected(newObj.id);
     }
 
     _setupTransitionScene() {
@@ -669,67 +424,18 @@ export class Game {
         }
 
         // Render
-        const renderCamera = store.showLevelEditor ? this.editorCamera : this.activeCamera;
+        const renderCamera = store.showLevelEditor ? this.editorCore.editorCamera : this.activeCamera;
 
-        if (store.showLevelEditor) {
-            if (this.orbitControls) {
-                if (!this.isGizmoDragging) this.orbitControls.enabled = true;
-                this.orbitControls.update();
-            }
-
-            // Sync gizmo spheres back to ECS entities if they move (e.g. zombies walking)
-            if (this.editorGizmos && !this.isGizmoDragging) {
-                this.editorGizmos.gizmos.forEach(g => {
-                    const id = g.id;
-                    if (g.type === 'camera') {
-                        const camObj = this.cameras && this.cameras[this.currentLevelIndex] && this.cameras[this.currentLevelIndex].find(c => c.camera.userData.id === id);
-                        if (camObj) {
-                            g.mesh.position.copy(camObj.camera.position);
-                            if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
-                                this.editorGizmos._ringMesh.position.copy(g.mesh.position);
-                            }
-                        }
-                    } else if (g.type === 'light') {
-                        const light = this.scene.children.find(c => c.isPointLight && c.userData.id === id);
-                        if (light) {
-                            g.mesh.position.copy(light.position);
-                            if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
-                                this.editorGizmos._ringMesh.position.copy(g.mesh.position);
-                            }
-                        }
-                    } else {
-                        let entity = this.world.entities.find(e => e.persistentId === id);
-                        if (!entity && id === 'playerSpawn') {
-                            entity = this.playerEntity;
-                        }
-
-                        if (entity && entity.components.Transform) {
-                            const tPos = entity.components.Transform.position;
-                            const yOffset = g.type === 'zombie' ? 0.5 : (g.type === 'collectible' ? 0.3 : (g.type === 'playerSpawn' ? 1.0 : 0));
-                            g.mesh.position.set(tPos.x, tPos.y + yOffset, tPos.z);
-
-                            if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
-                                this.editorGizmos._ringMesh.position.copy(g.mesh.position);
-                            }
-
-                            // Also force-sync the visual mesh (the white block character) so it's not left behind while paused
-                            const meshComp = entity.components.MeshComponent;
-                            if (meshComp && meshComp.mesh) {
-                                meshComp.mesh.position.copy(entity.components.Transform.position);
-                                meshComp.mesh.rotation.copy(entity.components.Transform.rotation);
-                            }
-                        }
-                    }
-                });
-            }
-        } else {
-            if (this.orbitControls) this.orbitControls.enabled = false;
+        if (this.editorCore) {
+            this.editorCore.update(dt);
         }
 
         if (this.isTransitioning) {
             this.renderer.render(this.transitionScene, this.transitionCamera);
         } else if (renderCamera) {
-            if (this.transformControl) this.transformControl.camera = renderCamera;
+            if (this.editorCore && this.editorCore.transformControl) {
+                this.editorCore.transformControl.camera = renderCamera;
+            }
 
             // 1. Full screen primary render
             this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);

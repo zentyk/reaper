@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { Transform, MeshComponent, PlayerTag, ZombieTag, ObstacleTag, CollectibleTag, DoorTag, Health, Movement, AI, Collider, Weapon, Inventory } from './components.js';
-import { store } from '../src/store.js';
+import { Transform, MeshComponent, PlayerTag, ZombieTag, ObstacleTag, CollectibleTag, DoorTag, Health, Movement, AI, Collider, Weapon, Inventory } from '../components.js';
+import { store } from '../../store.js';
 import { Pathfinder } from './Pathfinder.js';
 
 export class LevelManager {
@@ -60,7 +60,7 @@ export class LevelManager {
         this.setupCommonEnvironment();
 
         try {
-            const res = await fetch(`/js/levels/level${levelNumber}.json`);
+            const res = await fetch(`/src/game/levels/level${levelNumber}.json`);
             if (res.ok) {
                 const data = await res.json();
                 this.game.currentLevelData = data;

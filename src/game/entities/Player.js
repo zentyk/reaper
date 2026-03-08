@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { Input } from './core/Input.js';
-import { store } from '../src/store.js';
+import { Input } from '../../engine/core/Input.js';
+import { store } from '../../store.js';
 
 export class Player {
     constructor(scene, game) {

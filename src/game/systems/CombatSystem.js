@@ -1,6 +1,6 @@
 import { PlayerTag, ZombieTag, Transform, Health, Weapon, MeshComponent, InputState, Inventory, Grapple, AI } from '../components.js';
 import * as THREE from 'three';
-import { store } from '../../src/store.js';
+import { store } from '../../store.js';
 
 export class CombatSystem {
     constructor(game) {

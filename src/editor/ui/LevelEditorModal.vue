@@ -261,6 +261,12 @@ function setField(key, value) {
       data.playerSpawn.rot[axisIdx] = v;
       // We don't have a specific gizmo rotate by ID function easily accessible 
       // without directly digging into Game, but dragging the gizmo handles it anyway.
+      
+      // Update the actual visual gizmo mesh rotation
+      const gizmo = window.game?.editorGizmos?.gizmos.find(g => g.id === 'playerSpawn');
+      if (gizmo && gizmo.mesh) {
+        gizmo.mesh.rotation.set(data.playerSpawn.rot[0], data.playerSpawn.rot[1], data.playerSpawn.rot[2]);
+      }
     } else {
       const keys = ['x', 'y', 'z'];
       data.playerSpawn[keys[axisIdx]] = v;

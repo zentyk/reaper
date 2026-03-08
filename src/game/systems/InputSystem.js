@@ -1,4 +1,4 @@
-import { Input } from '../core/Input.js';
+import { Input } from '../../engine/core/Input.js';
 import { InputState, PlayerTag } from '../components.js';
 
 export class InputSystem {

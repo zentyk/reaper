@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import wasmUrl from '../build/release.wasm?url';
+import wasmUrl from '../../../build/release.wasm?url';
 
 export class Pathfinder {
     constructor(width, depth, obstacles) {

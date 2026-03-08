@@ -1,6 +1,6 @@
 import { Transform, AI, ZombieTag, PlayerTag, Movement, MeshComponent, Grapple, ObstacleTag, Collider } from '../components.js';
 import * as THREE from 'three';
-import { store } from '../../src/store.js';
+import { store } from '../../store.js';
 
 export class AISystem {
     constructor(pathfinder) {
