@@ -114,14 +114,11 @@ export class LevelManager {
         const floorColliderDesc = RAPIER.ColliderDesc.cuboid(50, 0.05, 50);
         this.game.physicsWorld.createCollider(floorColliderDesc, this.commonFloorBody);
 
-        // Lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        // Lights - Spooky atmosphere
+        const ambientLight = new THREE.AmbientLight(0x222233, 0.05); // Very dark, slightly blue ambient
         this.game.scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-        dirLight.position.set(5, 10, 7);
-        dirLight.castShadow = true;
-        this.game.scene.add(dirLight);
+        // Remove the bright directional light to enhance the flashlight effect
     }
 
     createEntity(components, id = null) {
@@ -163,6 +160,16 @@ export class LevelManager {
         this.game.activeCamera.position.set(...this.game.cameras[1][2].pos);
         this.game.activeCamera.lookAt(...this.game.cameras[1][2].lookAt);
 
+        // Lights
+        const pointLight1 = new THREE.PointLight(0xffaa55, 10, 15); // Warm color, intensity, distance
+        pointLight1.position.set(0, 3, 0); // Center of room, slightly elevated
+        this.game.scene.add(pointLight1);
+
+        // Door Light Level 1 (Locked - Red)
+        const doorLight1 = new THREE.PointLight(0xff4444, 5, 5); // Discrete red light
+        doorLight1.position.set(0, 3, -9); // Above and slightly in front of door (0, 1.5, -10)
+        this.game.scene.add(doorLight1);
+
         // Player
         this.createPlayer(0, 0, 0);
 
@@ -191,6 +198,16 @@ export class LevelManager {
         this.game.cameras.north.position.set(0, 15, -15);
         this.game.cameras.north.lookAt(0, 0, 0);
         this.game.activeCamera = this.game.cameras.north;
+
+        // Lights
+        const pointLight2 = new THREE.PointLight(0x77bbff, 15, 20); // Brighter cool color, wider area
+        pointLight2.position.set(0, 4, 0); // Center of room for better illumination
+        this.game.scene.add(pointLight2);
+
+        // Door Light Level 2 (Unlocked - Green)
+        const doorLight2 = new THREE.PointLight(0x44ff44, 5, 5); // Discrete green light
+        doorLight2.position.set(9, 3, 0); // Above and slightly in front of door (10, 1.5, 0)
+        this.game.scene.add(doorLight2);
 
         // Player (Spawn near the X=10 door)
         this.createPlayer(8, 0, 0);

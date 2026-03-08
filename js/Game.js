@@ -26,7 +26,7 @@ export class Game {
         this.store = store;
         // --- Core Systems ---
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x1a1a1a);
+        this.scene.background = new THREE.Color(0x000000);
 
         this.renderer = new THREE.WebGLRenderer();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -59,6 +59,10 @@ export class Game {
         this.gameState = new GameState();
         this.levelManager = new LevelManager(this);
         this.input = new Input();
+
+        // --- Level Editor Core ---
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
 
         // --- Player Controller ---
         this.player = new Player(this.scene, this);
@@ -102,6 +106,9 @@ export class Game {
             const lvl = e.detail?.level;
             if (lvl) this.loadLevel(lvl);
         });
+
+        // Editor Viewport Interaction
+        window.addEventListener('pointerdown', (e) => this._onEditorClick(e));
     }
 
     toggleColliderVisuals(show) {
@@ -150,6 +157,78 @@ export class Game {
 
     _bindUICallbacks() {
         this.ui.callbacks.onStart = () => this.startGame();
+    }
+
+    _onEditorClick(event) {
+        if (!store.showLevelEditor) return;
+
+        // Ignore clicks on UI elements (which should prevent propagation, but just in case)
+        if (event.target.closest('.editor-sidebar')) return;
+
+        // Calculate normalized device coordinates
+        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.activeCamera);
+
+        // 1. Check if clicking an existing gizmo
+        const hitId = this.editorGizmos.raycast(this.raycaster);
+
+        if (store.editorTool === 'select') {
+            store.editorSelectedId = hitId;
+            this.editorGizmos.setSelected(hitId);
+            return;
+        }
+
+        // 2. If placing a new object, find intersection with the floor
+        if (this.levelManager.commonFloorMesh) {
+            const intersects = this.raycaster.intersectObject(this.levelManager.commonFloorMesh);
+            if (intersects.length > 0) {
+                const p = intersects[0].point;
+                this._placeEditorObject(store.editorTool, p.x, p.y, p.z);
+            }
+        }
+    }
+
+    _placeEditorObject(type, x, y, z) {
+        if (!this.currentLevelData) return;
+
+        const id = `${type}_${Date.now()}`;
+        let newObj = null;
+
+        if (type === 'playerSpawn') {
+            // Only one player spawn allowed, so we replace it
+            this.currentLevelData.playerSpawn = { x, y, z };
+            newObj = { id: 'playerSpawn', pos: [x, y, z] };
+        } else if (type === 'camera') {
+            if (!this.currentLevelData.cameras) this.currentLevelData.cameras = [];
+            newObj = { id, pos: [x, y + 10, z], lookAt: [x, 0, z], bounds: { minX: x - 5, maxX: x + 5, minZ: z - 5, maxZ: z + 5 } };
+            this.currentLevelData.cameras.push(newObj);
+        } else if (type === 'zombie') {
+            if (!this.currentLevelData.zombies) this.currentLevelData.zombies = [];
+            newObj = { id, pos: [x, y, z] };
+            this.currentLevelData.zombies.push(newObj);
+        } else if (type === 'collectible') {
+            if (!this.currentLevelData.collectibles) this.currentLevelData.collectibles = [];
+            newObj = { id, type: 'ammo', name: 'Handgun Ammo', amount: 15, pos: [x, y, z] };
+            this.currentLevelData.collectibles.push(newObj);
+        }
+
+        // Sync Vue store to force UI update
+        store.editorLevelData = { ...this.currentLevelData };
+
+        // Ensure the visual gizmo is spawned
+        if (type === 'playerSpawn') {
+            // Remove old spawn point visually if it existed
+            this.editorGizmos.removeById('playerSpawn');
+            this.editorGizmos.addGizmo('playerSpawn', 'playerSpawn', x, y + 1, z);
+        } else {
+            this.editorGizmos.addGizmo(type, id, newObj.pos[0], newObj.pos[1] + (type === 'zombie' ? 0.5 : 0.3), newObj.pos[2]);
+        }
+
+        // Auto-select the newly placed object
+        store.editorSelectedId = newObj.id;
+        this.editorGizmos.setSelected(newObj.id);
     }
 
     _setupTransitionScene() {

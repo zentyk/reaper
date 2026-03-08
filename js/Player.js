@@ -32,9 +32,25 @@ export class Player {
         this.hitStaggering = false;
         this.hitStaggerTimer = 0;
 
-        // Pickup Logic
         this.pendingCollectible = null;
         this.isPickupPromptOpen = false;
+
+        // Flashlight setup
+        this.flashlight = new THREE.SpotLight(0xffffff, 100); // Color, Intensity (high for realistic falloff)
+        this.flashlight.angle = Math.PI / 6; // Narrow beam (30 degrees)
+        this.flashlight.penumbra = 0.5; // Soft edges
+        this.flashlight.decay = 2; // Realistic light decay
+        this.flashlight.distance = 25; // How far the light reaches
+        this.flashlight.castShadow = true;
+        this.flashlight.shadow.mapSize.width = 1024;
+        this.flashlight.shadow.mapSize.height = 1024;
+
+        // Target for the spotlight to point at
+        this.flashlightTarget = new THREE.Object3D();
+        this.scene.add(this.flashlightTarget);
+        this.flashlight.target = this.flashlightTarget;
+
+        this.scene.add(this.flashlight);
 
         this.setupCheatUI();
         this.setupPickupUI();
@@ -115,12 +131,27 @@ export class Player {
         }
         this.lastIState = isIDown;
 
-        // Sync UI with ECS data
+        // Sync UI and Visuals with ECS data
         const playerEntity = this.game.world.entities.find(e => e.components.PlayerTag);
         if (playerEntity) {
             const health = playerEntity.components.Health;
             if (health) {
                 this.game.ui.updateHealth(health.current, health.max);
+            }
+
+            // Sync Flashlight
+            const transform = playerEntity.components.Transform;
+            if (transform && this.flashlight) {
+                // Position light slightly above and offset to the right (like over the shoulder)
+                this.flashlight.position.set(transform.position.x, transform.position.y + 1.2, transform.position.z);
+
+                // Calculate forward vector based on rotation
+                const forward = new THREE.Vector3(0, 0, -1);
+                forward.applyEuler(transform.rotation);
+
+                // Set target slightly ahead and down
+                this.flashlightTarget.position.copy(transform.position).add(forward.multiplyScalar(5));
+                this.flashlightTarget.position.y = transform.position.y + 0.3;
             }
         }
 
