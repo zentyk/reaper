@@ -9,12 +9,11 @@
         <li 
           v-for="(option, index) in options" 
           :key="index"
-          @mouseenter="hoverIndex = index"
-          @mouseleave="hoverIndex = -1"
-          @click="option.action"
+          @mouseenter="selectedIndex = index"
           class="debug-item"
+          :class="{ 'debug-item-selected': selectedIndex === index }"
         >
-          <span class="cursor" :style="{ visibility: hoverIndex === index ? 'visible' : 'hidden' }">&gt; </span>
+          <span class="cursor" :style="{ visibility: selectedIndex === index ? 'visible' : 'hidden' }">&gt; </span>
           <span>{{ option.label() }}</span>
         </li>
       </ul>
@@ -23,16 +22,15 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 import { store } from '../../store.js';
 
-const hoverIndex = ref(-1);
+const selectedIndex = ref(0);
 
 const options = [
   {
     label: () => `Infinite Health: ${store.infiniteHealthCheat ? 'ON' : 'OFF'}`,
     action: () => {
-      // Need to add infiniteHealthCheat to store and game logic later, right now use simple event
       document.dispatchEvent(new CustomEvent('cheat-toggle', { bubbles: true }));
       store.infiniteHealthCheat = !store.infiniteHealthCheat;
     }
@@ -66,6 +64,34 @@ function loadLevel(level) {
   store.showDebugMenu = false;
   document.dispatchEvent(new CustomEvent('debug-load-level', { detail: { level }, bubbles: true }));
 }
+
+function handleKeyDown(e) {
+  if (!store.showDebugMenu) return;
+
+  const key = e.key.toLowerCase();
+  if (key === 'arrowup') {
+    selectedIndex.value = Math.max(0, selectedIndex.value - 1);
+    e.preventDefault();
+  } else if (key === 'arrowdown') {
+    selectedIndex.value = Math.min(options.length - 1, selectedIndex.value + 1);
+    e.preventDefault();
+  } else if (key === 'enter' || key === ' ') {
+    options[selectedIndex.value].action();
+    e.preventDefault();
+  }
+}
+
+watch(() => store.showDebugMenu, (val) => {
+  if (val) selectedIndex.value = 0;
+});
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <style scoped>

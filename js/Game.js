@@ -14,6 +14,7 @@ import { Player } from './Player.js';
 import { EditorGizmos } from './EditorGizmos.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import doorTextureUrl from '../img/door_texture.png?url';
+import { store } from '../src/store.js';
 
 export class Game {
     static async init() {
@@ -22,6 +23,7 @@ export class Game {
     }
 
     constructor() {
+        this.store = store;
         // --- Core Systems ---
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x1a1a1a);

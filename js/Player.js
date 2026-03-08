@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Input } from './core/Input.js';
+import { store } from '../src/store.js';
 
 export class Player {
     constructor(scene, game) {
@@ -37,6 +38,7 @@ export class Player {
 
         this.setupCheatUI();
         this.setupPickupUI();
+        this.setupDiscardUI();
     }
 
     setupCheatUI() {
@@ -60,16 +62,36 @@ export class Player {
         });
     }
 
+    setupDiscardUI() {
+        document.addEventListener('discard-yes', () => {
+            console.log("Player.js: received discard-yes event, discardItemIndex:", store.discardItemIndex);
+            if (store.discardItemIndex !== null) {
+                this.inventory[store.discardItemIndex] = null;
+                store.discardItemIndex = null;
+                store.discardItemName = '';
+                this.renderInventory();
+            }
+        });
+
+        document.addEventListener('discard-no', () => {
+            console.log("Player.js: received discard-no event");
+            store.discardItemIndex = null;
+            store.discardItemName = '';
+        });
+    }
+
     setupPickupUI() {
         document.addEventListener('pickup-yes', () => {
-            if (this.isPickupMode) {
+            console.log("Player.js: [pickup-yes] store.isPickupMode:", store.isPickupMode);
+            if (store.isPickupMode) {
                 this.collectItem();
                 this.closePickupPrompt();
             }
         });
 
         document.addEventListener('pickup-no', () => {
-            if (this.isPickupMode) {
+            console.log("Player.js: [pickup-no] store.isPickupMode:", store.isPickupMode);
+            if (store.isPickupMode) {
                 this.closePickupPrompt();
             }
         });
@@ -78,6 +100,9 @@ export class Player {
         document.addEventListener('inventory-close', () => {
             this.isInventoryOpen = false;
             this.game.isPaused = false;
+            store.isInventoryVisible = false;
+            // Clear interaction target when inventory closes
+            store.interactTarget = null;
         });
     }
 
@@ -311,7 +336,7 @@ export class Player {
                 {
                     label: item.equipped ? 'Unequip' : 'Equip/Use',
                     action: () => this.useItem(index),
-                    enabled: item.usable || item.type === 'weapon'
+                    enabled: item.usable || item.type === 'weapon' || item.type === 'key'
                 },
                 {
                     label: 'Combine',
@@ -345,7 +370,39 @@ export class Player {
                 this.inventory[index] = null;
                 this.renderInventory();
             }
+        } else if (item.type === 'key') {
+            const door = store.interactTarget;
+            if (door && door.components.DoorTag && door.components.DoorTag.isLocked) {
+                if (door.components.DoorTag.requiredKeyId === item.id) {
+                    door.components.DoorTag.isLocked = false;
+                    this.game.ui.showFeedback(`Used the ${item.name}.`);
+
+                    // Persist the unlock
+                    const doorId = door.persistentId || door.id;
+                    if (doorId) {
+                        this.game.gameState.recordDoorUnlocked(this.game.levelManager.currentLevel, doorId);
+                    }
+
+                    // Check if key is spent
+                    if (this.isKeySpent(item.id)) {
+                        store.discardItemIndex = index;
+                        store.discardItemName = item.name;
+                    }
+
+                    this.renderInventory();
+                } else {
+                    this.game.ui.examineItem("That won't work here.");
+                }
+            } else {
+                this.game.ui.examineItem("You can't use that here.");
+            }
         }
+    }
+
+    isKeySpent(keyId) {
+        // Logic: Check if any other doors in the world still require this key and are locked
+        const doors = this.game.world.entities.filter(e => e.components.DoorTag);
+        return !doors.some(d => d.components.DoorTag.requiredKeyId === keyId && d.components.DoorTag.isLocked);
     }
 
     equipWeapon(item) {
@@ -447,10 +504,15 @@ export class Player {
     }
 
     closePickupPrompt() {
+        console.log("Player.js: closing pickup prompt");
         this.game.isPaused = false;
         this.isPickupMode = false;
         this.pendingCollectible = null;
         this.game.ui.closePickupMode();
+
+        // Final force hide
+        store.isInventoryVisible = false;
+        store.isPickupMode = false;
     }
 
     collectItem() {
@@ -487,12 +549,28 @@ export class Player {
 
         } else if (tag.type === 'key') {
             const empty = this.inventory.findIndex(i => i === null);
-            if (empty !== -1) this.inventory[empty] = { id: 'key', name: 'Exit Key', type: 'key', combinable: false };
-            this.game.ui.showFeedback(`Picked up ${tag.name}`);
+            if (empty !== -1) {
+                this.inventory[empty] = {
+                    id: tag.id || id || 'key',
+                    name: tag.name || 'Key',
+                    type: 'key',
+                    combinable: false
+                };
+            }
+            this.game.ui.showFeedback(`Picked up ${tag.name || 'Key'}`);
         } else if (tag.type === 'health') {
             const empty = this.inventory.findIndex(i => i === null);
-            if (empty !== -1) this.inventory[empty] = { id: 'herb', name: 'Green Herb', type: 'health', amount: tag.amount, combinable: false, usable: true };
-            this.game.ui.showFeedback(`Picked up ${tag.name}`);
+            if (empty !== -1) {
+                this.inventory[empty] = {
+                    id: 'herb',
+                    name: 'Green Herb',
+                    type: 'health',
+                    amount: tag.amount,
+                    combinable: false,
+                    usable: true
+                };
+            }
+            this.game.ui.showFeedback(`Picked up ${tag.name || 'Health'}`);
         }
 
         // Remove from scene
@@ -504,13 +582,12 @@ export class Player {
 
     // Door Logic
     tryOpenDoor(door) {
-        // Check if player has the key
-        const hasKey = this.inventory.some(item => item && item.id === 'key');
-
-        if (hasKey) {
-            this.initiateLevelChange(door.components.DoorTag.targetLevel);
+        const doorTag = door.components.DoorTag;
+        if (doorTag.isLocked) {
+            this.game.ui.showFeedback("The door is locked.");
+            store.interactTarget = door;
         } else {
-            this.game.ui.showFeedback("It's locked. You need a key.");
+            this.initiateLevelChange(doorTag.targetLevel);
         }
     }
 

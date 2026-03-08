@@ -177,8 +177,8 @@ export class LevelManager {
         this.createCollectible('key1', 'key', 1, 'Exit Key', 3, 0.1, 2);
         this.createCollectible('herb1', 'health', 50, 'Green Herb', -2, 0.15, -2);
 
-        // Door (id, x, y, z, w, h, d, targetLevel)
-        this.createDoor('door1', 0, 1.5, -10, 2, 3, 0.2, 2);
+        // Door (id, x, y, z, w, h, d, targetLevel, isLocked, requiredKeyId)
+        this.createDoor('door1', 0, 1.5, -10, 2, 3, 0.2, 2, true, 'key1');
 
         // Zombies
         this.createZombie('zombie1', -7, -7);
@@ -203,7 +203,6 @@ export class LevelManager {
         // Collectibles
         this.createCollectible('l2_ammo1', 'ammo', 15, 'Handgun Ammo', -5, 0.15, -5);
         this.createCollectible('l2_herb1', 'health', 50, 'Green Herb', 5, 0.15, 5);
-        this.createCollectible('l2_key1', 'key', 1, 'Exit Key', 0, 0.1, 8);
 
         // Door
         this.createDoor('l2_door1', 10, 1.5, 0, 0.2, 3, 2, 1);
@@ -376,7 +375,12 @@ export class LevelManager {
         this.game.interactables.push(entity);
     }
 
-    createDoor(id, x, y, z, w, h, d, targetLevel) {
+    createDoor(id, x, y, z, w, h, d, targetLevel, isLocked = false, requiredKeyId = null) {
+        // Persistence check
+        if (this.game.gameState.isDoorUnlocked(this.currentLevel, id)) {
+            isLocked = false;
+        }
+
         const geometry = new THREE.BoxGeometry(w, h, d);
         const material = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
         const mesh = new THREE.Mesh(geometry, material);
@@ -392,7 +396,7 @@ export class LevelManager {
         const entity = this.createEntity([
             new Transform(x, y, z),
             new MeshComponent(mesh),
-            new DoorTag(targetLevel),
+            new DoorTag(targetLevel, isLocked, requiredKeyId),
             new ObstacleTag(),
             new Collider(Math.max(w, d) / 2)
         ], id);

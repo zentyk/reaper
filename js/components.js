@@ -28,8 +28,10 @@ export class CollectibleTag {
     }
 }
 export class DoorTag {
-    constructor(targetLevel) {
+    constructor(targetLevel, isLocked = false, requiredKeyId = null) {
         this.targetLevel = targetLevel;
+        this.isLocked = isLocked;
+        this.requiredKeyId = requiredKeyId;
     }
 }
 

@@ -29,18 +29,36 @@ export class MovementSystem {
 
         for (const entity of entities) {
             if (entity.components.PlayerTag && entity.components.Transform && entity.components.Movement && entity.components.InputState) {
-                this.handlePlayerMovement(entity, dt);
+                this.handlePlayerMovement(entity, entities, dt);
             }
         }
     }
 
-    handlePlayerMovement(entity, dt = 0.016) {
+    handlePlayerMovement(entity, entities, dt = 0.016) {
         const transform = entity.components.Transform;
         const movement = entity.components.Movement;
         const input = entity.components.InputState;
         const meshComp = entity.components.MeshComponent;
         const grapple = entity.components.Grapple;
         const rigidBody = entity.rigidBody;
+
+        // ── Interaction: Kick knocked-down zombies ──────────────────────
+        if (input.interact && this.game && this.game.systems && this.game.systems.combat) {
+            const knockedZombies = entities.filter(e =>
+                e.components.ZombieTag &&
+                e.components.AI &&
+                e.components.AI.state === 'knocked_down'
+            );
+
+            for (const z of knockedZombies) {
+                const zPos = z.components.Transform.position;
+                // Kick range: ~1.5 units
+                if (transform.position.distanceTo(zPos) < 1.5) {
+                    this.game.systems.combat.kickEntity(z);
+                    break;
+                }
+            }
+        }
 
         // ── Quick Turn (Normal / Easy only) ─────────────────────────────
         if (store.difficulty !== 'hard') {

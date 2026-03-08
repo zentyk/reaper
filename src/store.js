@@ -9,6 +9,8 @@ export const store = reactive({
     // Inventory
     isPickupMode: false,
     pickupItemName: '',
+    discardItemIndex: null,
+    discardItemName: '',
     examineText: '',
 
     // HUD
@@ -33,6 +35,9 @@ export const store = reactive({
     // Inventory
     inventory: [null, null, null, null, null, null],
     combineSourceIndex: null,
+
+    // Interaction
+    interactTarget: null,
 
     // Context Menu
     contextMenu: {

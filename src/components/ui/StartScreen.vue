@@ -25,6 +25,7 @@
 </template>
 
 <script setup>
+import { onMounted, onUnmounted } from 'vue'
 import { store } from '../../store.js'
 import Button from 'primevue/button'
 
@@ -32,6 +33,27 @@ function startGame() {
   store.isStartScreenVisible = false;
   document.dispatchEvent(new CustomEvent('start-game'));
 }
+
+function handleKeyDown(e) {
+  if (!store.isStartScreenVisible) return;
+
+  const key = e.key.toLowerCase();
+  if (key === 'arrowleft') {
+    store.difficulty = 'normal';
+  } else if (key === 'arrowright') {
+    store.difficulty = 'hard';
+  } else if (key === 'enter' || key === ' ') {
+    startGame();
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown);
+});
 </script>
 
 <style scoped>

@@ -580,14 +580,18 @@ export class CombatSystem {
                 const zTransform = entity.components.Transform;
                 const ai = entity.components.AI;
 
-                if (ai.state === 'knocked_down' || ai.state === 'dead') continue;
+                const isKnocked = ai.state === 'knocked_down';
+                if (ai.state === 'dead') continue;
 
                 const dx = zTransform.position.x - pTransform.position.x;
                 const dz = zTransform.position.z - pTransform.position.z;
                 const distSq = dx * dx + dz * dz;
 
-                if (distSq < 1.2) {
-                    console.log("Grappled!");
+                // Normal bite (chase/idle) has larger range (1.2), floor bite has smaller range (0.8)
+                const attackRange = isKnocked ? 0.8 : 1.2;
+
+                if (distSq < attackRange) {
+                    console.log(isKnocked ? "Floor Bite!" : "Grappled!");
                     grapple.isGrappled = true;
                     grapple.grappler = entity;
                     grapple.struggleCount = 0;
@@ -601,11 +605,29 @@ export class CombatSystem {
                         if (mesh.material) mesh.material.color.setHex(0xff00ff);
                     }
 
-                    const biteDamage = store.difficulty === 'hard' ? 30 : 10;
+                    const baseDamage = store.difficulty === 'hard' ? 30 : 10;
+                    const biteDamage = isKnocked ? Math.floor(baseDamage * 0.5) : baseDamage;
                     this.damageEntity(player, biteDamage);
                     return;
                 }
             }
+        }
+    }
+
+    kickEntity(zombie) {
+        console.log("Kicking Zombie!");
+
+        const killChance = 0.75; // Never > 80%
+        if (Math.random() < killChance) {
+            this.killEntity(zombie);
+            // Visual feedback - small blood burst or flash
+            this.flashEntity(zombie, 0xff0000);
+            this.spawnBloodParticles(zombie);
+        } else {
+            console.log("Kick failed to kill!");
+            this.damageEntity(zombie, 1);
+            this.flashEntity(zombie, 0xffffff); // White flash for "it's not enough"
+            this.applyZombieRecoil(zombie, this.game.world.entities.find(e => e.components.PlayerTag));
         }
     }
 }
