@@ -11,6 +11,7 @@ import { LevelManager } from './LevelManager.js';
 import { Input } from './core/Input.js';
 import { AudioHandler } from './AudioHandler.js';
 import { Player } from './Player.js';
+import { EditorGizmos } from './EditorGizmos.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import doorTextureUrl from '../img/door_texture.png?url';
 
@@ -38,6 +39,8 @@ export class Game {
         this.cameras = {
             north: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
             south: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
+            corner: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
+            main: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000),
             cutscene: new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
         };
         this.activeCamera = null;
@@ -86,6 +89,17 @@ export class Game {
         this.animate(0);
 
         this._setupTransitionScene();
+
+        // --- Level Editor ---
+        this.editorGizmos = new EditorGizmos(this.scene);
+        this.currentLevelData = null;
+        this.currentLevelIndex = 1;
+
+        // editor-load-level: triggered from the level editor UI
+        document.addEventListener('editor-load-level', (e) => {
+            const lvl = e.detail?.level;
+            if (lvl) this.loadLevel(lvl);
+        });
     }
 
     toggleColliderVisuals(show) {

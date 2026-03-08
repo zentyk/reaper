@@ -19,6 +19,11 @@ export const store = reactive({
     showColliders: false,
     showDebugMenu: false,
     instaKillCheat: false,
+    showLevelEditor: false,
+    editorTool: 'select',
+    editorLevel: 1,
+    editorSelectedId: null,
+    editorLevelData: null,
 
     // Game state
     levelText: 'Level 1',

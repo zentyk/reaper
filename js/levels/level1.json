@@ -1,0 +1,143 @@
+{
+    "playerSpawn": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+    },
+    "cameras": [
+        {
+            "id": "corner",
+            "pos": [
+                -10,
+                8,
+                -10
+            ],
+            "lookAt": [
+                -5,
+                0,
+                -5
+            ],
+            "bounds": {
+                "minX": -100,
+                "maxX": -5,
+                "minZ": -100,
+                "maxZ": -5
+            }
+        },
+        {
+            "id": "south",
+            "pos": [
+                0,
+                10,
+                15
+            ],
+            "lookAt": [
+                0,
+                0,
+                0
+            ],
+            "bounds": {
+                "minX": -100,
+                "maxX": 100,
+                "minZ": 0,
+                "maxZ": 100
+            }
+        },
+        {
+            "id": "main",
+            "pos": [
+                0,
+                10,
+                -15
+            ],
+            "lookAt": [
+                0,
+                0,
+                0
+            ],
+            "bounds": {
+                "minX": -100,
+                "maxX": 100,
+                "minZ": -100,
+                "maxZ": 100
+            }
+        }
+    ],
+    "zombies": [
+        {
+            "id": "zombie1",
+            "pos": [
+                -7,
+                0,
+                -7
+            ]
+        },
+        {
+            "id": "zombie2",
+            "pos": [
+                7,
+                0,
+                -7
+            ]
+        },
+        {
+            "id": "zombie3",
+            "pos": [
+                0,
+                0,
+                5
+            ]
+        }
+    ],
+    "collectibles": [
+        {
+            "id": "ammo1",
+            "type": "ammo",
+            "amount": 15,
+            "name": "Handgun Ammo",
+            "pos": [
+                2,
+                0.15,
+                2
+            ]
+        },
+        {
+            "id": "key1",
+            "type": "key",
+            "amount": 1,
+            "name": "Exit Key",
+            "pos": [
+                3,
+                0.1,
+                2
+            ]
+        },
+        {
+            "id": "herb1",
+            "type": "health",
+            "amount": 50,
+            "name": "Green Herb",
+            "pos": [
+                -2,
+                0.15,
+                -2
+            ]
+        }
+    ],
+    "doors": [
+        {
+            "id": "door1",
+            "pos": [
+                0,
+                1.5,
+                -10
+            ],
+            "size": [
+                2,
+                3,
+                0.2
+            ],
+            "targetLevel": 2
+        }
+    ]
+}
