@@ -32,6 +32,12 @@
       <!-- Inspector -->
       <div class="editor-section" v-if="selected">
         <div class="editor-label">INSPECTOR — {{ selected.type.toUpperCase() }}</div>
+        
+        <div class="editor-btn-row" style="margin-bottom: 10px;">
+          <button class="ed-btn" @click="setGizmoMode('translate')">⬌ Move</button>
+          <button class="ed-btn" @click="setGizmoMode('rotate')">⭘ Rot</button>
+          <button class="ed-btn" @click="setGizmoMode('scale')">⤡ Scale</button>
+        </div>
         <div class="inspector-field" v-for="field in editableFields" :key="field.key">
           <label>{{ field.label }}</label>
           <input type="number" step="0.1"
@@ -70,6 +76,25 @@
               @change="updateBound(bk, +$event.target.value)" />
           </div>
         </template>
+        <!-- Light extras -->
+        <template v-if="selected.type === 'light'">
+          <div class="inspector-field">
+            <label>Color (Hex)</label>
+            <!-- Show hex format for easier editing, convert string to number on save -->
+            <input type="text" :value="'#' + selectedData.color.toString(16).padStart(6, '0')"
+              @input="handleLightColorChange($event.target.value)" />
+          </div>
+          <div class="inspector-field">
+            <label>Intensity</label>
+            <input type="number" step="0.5" :value="selectedData.intensity"
+              @change="updateDataField('intensity', +$event.target.value); applyLightUpdate()" />
+          </div>
+          <div class="inspector-field">
+            <label>Distance</label>
+            <input type="number" step="1" :value="selectedData.distance"
+              @change="updateDataField('distance', +$event.target.value); applyLightUpdate()" />
+          </div>
+        </template>
         <button class="ed-btn delete-btn" @click="deleteSelected">🗑 DELETE</button>
       </div>
     </div>
@@ -95,6 +120,11 @@
         <button class="ed-btn action-btn" @click="reloadLevel">🔄 Reload Level</button>
       </div>
     </div>
+
+    <!-- Camera Preview Frame (WebGL draws underneath this) -->
+    <div class="camera-preview-container" v-if="selected?.type === 'camera'">
+      <div class="camera-preview-title">Camera Preview</div>
+    </div>
   </div>
 </template>
 
@@ -109,6 +139,7 @@ const tools = [
   { key: 'playerSpawn', icon: '🟢', label: 'Player Spawn' },
   { key: 'zombie',      icon: '💀', label: 'Zombie' },
   { key: 'collectible', icon: '📦', label: 'Collectible' },
+  { key: 'light',       icon: '💡', label: 'Light' },
 ];
 
 // ─── Reactive level data from store (set by App.vue on F4 open) ───────
@@ -126,6 +157,7 @@ const allObjects = computed(() => {
   (data.cameras || []).forEach(c => list.push({ id: c.id, type: 'camera', data: c, pos: c.pos }));
   (data.zombies || []).forEach(z => list.push({ id: z.id, type: 'zombie', data: z, pos: z.pos }));
   (data.collectibles || []).forEach(it => list.push({ id: it.id, type: 'collectible', data: it, pos: it.pos }));
+  (data.lights || []).forEach(l => list.push({ id: l.id, type: 'light', data: l, pos: l.pos }));
 
   return list;
 });
@@ -142,6 +174,12 @@ const selectedData = computed(() => selected.value?.data || null);
 function selectById(id) {
   store.editorSelectedId = id;
   window.game?.editorGizmos?.setSelected(id);
+}
+
+function setGizmoMode(mode) {
+  if (window.game && window.game.transformControl) {
+    window.game.transformControl.setMode(mode);
+  }
 }
 
 watch(() => store.editorSelectedId, id => {
@@ -189,13 +227,33 @@ function updateLookAt(idx, value) {
 function updateBound(key, value) {
   if (selectedData.value?.bounds) selectedData.value.bounds[key] = value;
 }
+function handleLightColorChange(hexString) {
+  const cleanHex = hexString.replace('#', '');
+  if (cleanHex.length === 6) {
+    const num = parseInt(cleanHex, 16);
+    if (!isNaN(num)) {
+      updateDataField('color', num);
+      applyLightUpdate();
+    }
+  }
+}
+function applyLightUpdate() {
+  const d = selectedData.value;
+  if (!d) return;
+  const light = window.game?.scene?.children?.find(c => c.isPointLight && c.userData.id === d.id);
+  if (light) {
+    light.color.setHex(d.color);
+    light.intensity = d.intensity;
+    light.distance = d.distance;
+  }
+}
 
 // ─── Delete ───────────────────────────────────────────────────────────
 function deleteSelected() {
   const sel = selected.value;
   if (!sel || sel.type === 'playerSpawn') return;
   const data = d.value;
-  const listKey = { camera: 'cameras', zombie: 'zombies', collectible: 'collectibles' }[sel.type];
+  const listKey = { camera: 'cameras', zombie: 'zombies', collectible: 'collectibles', light: 'lights' }[sel.type];
   if (listKey) data[listKey] = data[listKey].filter(o => o.id !== sel.id);
   window.game?.editorGizmos?.removeById(sel.id);
   store.editorSelectedId = null;
@@ -402,4 +460,31 @@ function formatPos(obj) {
   margin-top: 4px;
 }
 .action-btn { text-align: center; font-size: 11px; }
+
+/* Camera Preview */
+.camera-preview-container {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  height: 180px;
+  pointer-events: none;
+  border: 1px solid #1e3a5f;
+  background: transparent;
+  box-shadow: 0 0 15px rgba(0,0,0,0.8);
+}
+.camera-preview-title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(14, 50, 86, 0.9);
+  color: #7ad4f5;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-bottom: 1px solid #1e3a5f;
+  box-sizing: border-box;
+}
 </style>

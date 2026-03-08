@@ -5,6 +5,7 @@ const COLORS = {
     playerSpawn: 0x00cc44,  // green
     zombie: 0xff2222,  // red
     collectible: 0x2288ff,  // blue
+    light: 0xffffaa,   // bright yellow-white
     selected: 0xffffff,  // white selection ring
 };
 
@@ -13,6 +14,7 @@ const GIZMO_SCALE = {
     playerSpawn: 0.55,
     zombie: 0.35,
     collectible: 0.30,
+    light: 0.35,
 };
 
 export class EditorGizmos {
@@ -49,6 +51,11 @@ export class EditorGizmos {
         (levelData.collectibles || []).forEach(item => {
             this._add('collectible', item.id, item.pos[0], item.pos[1] + 0.3, item.pos[2]);
         });
+
+        // Lights
+        (levelData.lights || []).forEach(l => {
+            this._add('light', l.id, l.pos[0], l.pos[1], l.pos[2]);
+        });
     }
 
     _add(type, id, x, y, z) {
@@ -81,6 +88,11 @@ export class EditorGizmos {
         const idx = this.gizmos.findIndex(g => g.id === id);
         if (idx === -1) return;
         const { mesh } = this.gizmos[idx];
+
+        if (window.game && window.game.transformControl && window.game.transformControl.object === mesh) {
+            window.game.transformControl.detach();
+        }
+
         this.scene.remove(mesh);
         mesh.geometry.dispose();
         mesh.material.dispose();
@@ -105,9 +117,20 @@ export class EditorGizmos {
             this._ringMesh = null;
         }
 
-        if (!id) return;
+        if (!id) {
+            if (window.game && window.game.transformControl) {
+                window.game.transformControl.detach();
+            }
+            return;
+        }
+
         const g = this.gizmos.find(g => g.id === id);
-        if (!g) return;
+        if (!g) {
+            if (window.game && window.game.transformControl) {
+                window.game.transformControl.detach();
+            }
+            return;
+        }
 
         const ringGeo = new THREE.RingGeometry(
             (GIZMO_SCALE[g.type] || 0.35) + 0.08,
@@ -126,6 +149,11 @@ export class EditorGizmos {
         this._ringMesh.position.copy(g.mesh.position);
         this._ringMesh.renderOrder = 1000;
         this.scene.add(this._ringMesh);
+
+        // Attach TransformControl to the selected mesh
+        if (window.game && window.game.transformControl) {
+            window.game.transformControl.attach(g.mesh);
+        }
     }
 
     /** Raycast against all gizmos, returns closest hit id or null */
@@ -138,6 +166,10 @@ export class EditorGizmos {
 
     /** Remove all gizmos */
     clear() {
+        if (window.game && window.game.transformControl) {
+            window.game.transformControl.detach();
+        }
+
         for (const g of this.gizmos) {
             this.scene.remove(g.mesh);
             g.mesh.geometry.dispose();

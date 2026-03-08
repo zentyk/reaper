@@ -47,17 +47,36 @@ export class LevelManager {
         }
     }
 
-    loadLevel(levelNumber) {
+    async loadLevel(levelNumber) {
         this.currentLevel = levelNumber;
         console.log(`Loading Level ${levelNumber}`);
 
         this.clearLevel();
         this.setupCommonEnvironment();
 
-        if (levelNumber === 1) {
-            this.setupLevel1();
-        } else {
-            this.setupLevel2();
+        try {
+            const res = await fetch(`/js/levels/level${levelNumber}.json`);
+            if (res.ok) {
+                const data = await res.json();
+                this.game.currentLevelData = data;
+                store.editorLevelData = data;
+                this.buildFromLevelData(data);
+            } else {
+                console.warn(`Level ${levelNumber} JSON not found, falling back to hardcoded.`);
+                if (levelNumber === 1) this.setupLevel1();
+                else this.setupLevel2();
+
+                // Construct fallback data for editor
+                this.game.currentLevelData = {
+                    playerSpawn: { x: levelNumber === 1 ? 0 : 8, y: 0, z: 0 },
+                    cameras: [{ id: 'main', pos: [0, 10, -15], lookAt: [0, 0, 0], bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 } }],
+                    zombies: [], collectibles: []
+                };
+            }
+        } catch (e) {
+            console.error("Error loading level JSON:", e);
+            if (levelNumber === 1) this.setupLevel1();
+            else this.setupLevel2();
         }
 
         this.game.ui.updateLevelText(levelNumber);
@@ -136,29 +155,66 @@ export class LevelManager {
         return entity;
     }
 
-    setupLevel1() {
-        // Cameras handled dynamically by update()
-        this.game.cameras[1] = [
-            {
-                camera: this.cameras.corner,
-                pos: [-10, 8, -10], lookAt: [-5, 0, -5],
-                bounds: { minX: -100, maxX: -5, minZ: -100, maxZ: -5 }
-            },
-            {
-                camera: this.cameras.south,
-                pos: [0, 10, 15], lookAt: [0, 0, 0],
-                bounds: { minX: -100, maxX: 100, minZ: 0, maxZ: 100 }
-            },
-            {
-                camera: this.cameras.main,
-                pos: [0, 10, -15], lookAt: [0, 0, 0],
-                bounds: { minX: -100, maxX: 100, minZ: -100, maxZ: 100 }
-            }
-        ];
+    buildFromLevelData(data) {
+        // Cameras
+        if (data.cameras && data.cameras.length > 0) {
+            this.game.cameras[this.currentLevel] = data.cameras.map(c => {
+                const cam = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                cam.userData.id = c.id;
+                return { camera: cam, pos: c.pos, lookAt: c.lookAt, bounds: c.bounds };
+            });
+            this.game.activeCamera = this.game.cameras[this.currentLevel][0].camera;
+            this.game.activeCamera.position.set(...this.game.cameras[this.currentLevel][0].pos);
+            this.game.activeCamera.lookAt(...this.game.cameras[this.currentLevel][0].lookAt);
+        }
 
-        this.game.activeCamera = this.game.cameras[1][2].camera; // Default to main
-        this.game.activeCamera.position.set(...this.game.cameras[1][2].pos);
-        this.game.activeCamera.lookAt(...this.game.cameras[1][2].lookAt);
+        // Lighting based on Level JSON
+        if (data.lights && data.lights.length > 0) {
+            data.lights.forEach(l => {
+                const pointLight = new THREE.PointLight(l.color, l.intensity, l.distance);
+                pointLight.position.set(l.pos[0], l.pos[1], l.pos[2]);
+                pointLight.userData.id = l.id;
+                this.game.scene.add(pointLight);
+            });
+        }
+
+        if (this.currentLevel === 1) {
+            // Hardcoded map geometry for lvl 1
+            this.createObstacle('obs1', 5, 5, 2, 2);
+            this.createObstacle('obs2', -5, -5, 2, 2);
+            this.createObstacle('obs3', 5, -5, 1, 4);
+            this.createObstacle('obs4', -5, 5, 4, 1);
+            this.createDoor('door1', 0, 1.5, -10, 2, 3, 0.2, 2, true, 'key1');
+        } else if (this.currentLevel === 2) {
+            // Hardcoded map geometry for lvl 2
+            this.createObstacle('l2_obs1', 0, 0, 4, 4);
+            this.createObstacle('l2_obs2', -8, -8, 2, 2);
+            this.createObstacle('l2_obs3', 8, 8, 2, 2);
+            this.createDoor('l2_door1', 10, 1.5, 0, 0.2, 3, 2, 1);
+        }
+
+        // Player Spawn
+        if (data.playerSpawn) {
+            this.createPlayer(data.playerSpawn.x, data.playerSpawn.z);
+        }
+
+        // Zombies
+        if (data.zombies) {
+            data.zombies.forEach(z => {
+                this.createZombie(z.id, z.pos[0], z.pos[2]);
+            });
+        }
+
+        // Collectibles
+        if (data.collectibles) {
+            data.collectibles.forEach(c => {
+                this.createCollectible(c.id, c.type || 'ammo', c.amount || 15, c.name || 'Item', c.pos[0], c.pos[1], c.pos[2]);
+            });
+        }
+    }
+
+    setupLevel1() {
+        // Cameras are loaded from JSON and handled dynamically by update()
 
         // Lights
         const pointLight1 = new THREE.PointLight(0xffaa55, 10, 15); // Warm color, intensity, distance
@@ -170,8 +226,7 @@ export class LevelManager {
         doorLight1.position.set(0, 3, -9); // Above and slightly in front of door (0, 1.5, -10)
         this.game.scene.add(doorLight1);
 
-        // Player
-        this.createPlayer(0, 0, 0);
+        // Player is loaded from JSON
 
         // Obstacles
         this.createObstacle('obs1', 5, 5, 2, 2);
@@ -179,25 +234,16 @@ export class LevelManager {
         this.createObstacle('obs3', 5, -5, 1, 4);
         this.createObstacle('obs4', -5, 5, 4, 1);
 
-        // Collectibles
-        this.createCollectible('ammo1', 'ammo', 15, 'Handgun Ammo', 2, 0.15, 2);
-        this.createCollectible('key1', 'key', 1, 'Exit Key', 3, 0.1, 2);
-        this.createCollectible('herb1', 'health', 50, 'Green Herb', -2, 0.15, -2);
+        // Collectibles are loaded from JSON
 
         // Door (id, x, y, z, w, h, d, targetLevel, isLocked, requiredKeyId)
         this.createDoor('door1', 0, 1.5, -10, 2, 3, 0.2, 2, true, 'key1');
 
-        // Zombies
-        this.createZombie('zombie1', -7, -7);
-        this.createZombie('zombie2', 7, -7);
-        this.createZombie('zombie3', 0, 5);
+        // Zombies are loaded from JSON
     }
 
     setupLevel2() {
-        // Cameras
-        this.game.cameras.north.position.set(0, 15, -15);
-        this.game.cameras.north.lookAt(0, 0, 0);
-        this.game.activeCamera = this.game.cameras.north;
+        // Cameras are loaded from JSON
 
         // Lights
         const pointLight2 = new THREE.PointLight(0x77bbff, 15, 20); // Brighter cool color, wider area
@@ -209,25 +255,19 @@ export class LevelManager {
         doorLight2.position.set(9, 3, 0); // Above and slightly in front of door (10, 1.5, 0)
         this.game.scene.add(doorLight2);
 
-        // Player (Spawn near the X=10 door)
-        this.createPlayer(8, 0, 0);
+        // Player is loaded from JSON
 
         // Obstacles
         this.createObstacle('l2_obs1', 0, 0, 4, 4); // Center pillar
         this.createObstacle('l2_obs2', -8, -8, 2, 2);
         this.createObstacle('l2_obs3', 8, 8, 2, 2);
 
-        // Collectibles
-        this.createCollectible('l2_ammo1', 'ammo', 15, 'Handgun Ammo', -5, 0.15, -5);
-        this.createCollectible('l2_herb1', 'health', 50, 'Green Herb', 5, 0.15, 5);
+        // Collectibles are loaded from JSON
 
         // Door
         this.createDoor('l2_door1', 10, 1.5, 0, 0.2, 3, 2, 1);
 
-        // Zombies
-        this.createZombie('l2_zombie1', -7, 0);
-        this.createZombie('l2_zombie2', 7, 0);
-        this.createZombie('l2_zombie3', 0, 7);
+        // Zombies are loaded from JSON
     }
 
     createPlayer(x, z) {

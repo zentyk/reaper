@@ -136,5 +136,29 @@
             ],
             "targetLevel": 1
         }
+    ],
+    "lights": [
+        {
+            "id": "main_light",
+            "pos": [
+                0,
+                4,
+                0
+            ],
+            "color": 7846911,
+            "intensity": 15,
+            "distance": 20
+        },
+        {
+            "id": "door_light",
+            "pos": [
+                10,
+                3,
+                0
+            ],
+            "color": 4521796,
+            "intensity": 5,
+            "distance": 5
+        }
     ]
 }

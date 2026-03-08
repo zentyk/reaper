@@ -15,6 +15,8 @@ import { EditorGizmos } from './EditorGizmos.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import doorTextureUrl from '../img/door_texture.png?url';
 import { store } from '../src/store.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 export class Game {
     static async init() {
@@ -107,8 +109,127 @@ export class Game {
             if (lvl) this.loadLevel(lvl);
         });
 
+        // Transform Controls (Unity/UE5 Style Gizmos)
+        this.editorCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.editorCamera.position.set(0, 15, 15);
+        this.editorCamera.lookAt(0, 0, 0);
+
+        this.orbitControls = new OrbitControls(this.editorCamera, this.renderer.domElement);
+        this.orbitControls.enabled = false; // Disabled by default until editor opens
+
+        this.transformControl = new TransformControls(this.editorCamera, this.renderer.domElement);
+        this.isGizmoDragging = false;
+
+        this.transformControl.addEventListener('dragging-changed', (event) => {
+            this.isGizmoDragging = event.value;
+            // Disable orbit controls while dragging gizmo so we don't accidentally rotate the camera
+            this.orbitControls.enabled = !event.value;
+        });
+
+        this.transformControl.addEventListener('change', () => {
+            if (!this.transformControl.object) return;
+
+            const mesh = this.transformControl.object;
+
+            // Sync the red selection ring position with the mesh
+            if (this.editorGizmos && this.editorGizmos._ringMesh) {
+                this.editorGizmos._ringMesh.position.copy(mesh.position);
+            }
+
+            // Update Vue Store when dragging ends or during drag
+            if (this.isGizmoDragging && this.currentLevelData) {
+                const type = mesh.userData.editorType;
+                const id = mesh.userData.editorId;
+                const pos = mesh.position;
+
+                const syncItem = (list, yOffset = 0) => {
+                    if (!list) return;
+                    const it = list.find(i => i.id === id);
+                    if (it && it.pos) {
+                        it.pos[0] = pos.x;
+                        it.pos[1] = pos.y - yOffset;
+                        it.pos[2] = pos.z;
+                    }
+                };
+
+                if (type === 'playerSpawn') {
+                    this.currentLevelData.playerSpawn.x = pos.x;
+                    this.currentLevelData.playerSpawn.y = pos.y - 1.0;
+                    this.currentLevelData.playerSpawn.z = pos.z;
+                } else if (type === 'camera') {
+                    syncItem(this.currentLevelData.cameras, 0);
+                    if (this.cameras && this.cameras[this.currentLevelIndex]) {
+                        const camObj = this.cameras[this.currentLevelIndex].find(c => c.camera.userData.id === id);
+                        if (camObj) {
+                            camObj.camera.position.set(pos.x, pos.y, pos.z);
+                            camObj.pos = [pos.x, pos.y, pos.z];
+                            if (mesh.rotation) camObj.camera.rotation.copy(mesh.rotation);
+                        }
+                    }
+                } else if (type === 'light') {
+                    syncItem(this.currentLevelData.lights, 0);
+                    const light = this.scene.children.find(c => c.isPointLight && c.userData.id === id);
+                    if (light) {
+                        light.position.copy(pos);
+                    }
+                } else if (type === 'zombie') {
+                    syncItem(this.currentLevelData.zombies, 0.5);
+                } else if (type === 'collectible') {
+                    syncItem(this.currentLevelData.collectibles, 0.3);
+                }
+
+                // Sync the actual game ECS entity in realtime so the visual model moves
+                let entity = this.world.entities.find(e => e.persistentId === id);
+                if (!entity && id === 'playerSpawn') {
+                    entity = this.playerEntity;
+                }
+
+                if (entity) {
+                    const transform = entity.components.Transform;
+                    if (transform) {
+                        // Keep the entity's Y offset based on type
+                        const yOffset = type === 'zombie' ? 0.5 : (type === 'collectible' ? 0.3 : 0);
+                        transform.position.set(pos.x, pos.y - yOffset, pos.z);
+                        if (entity.rigidBody) {
+                            entity.rigidBody.setTranslation({ x: pos.x, y: pos.y - yOffset, z: pos.z }, true);
+                        }
+
+                        // For rotations
+                        if (mesh.rotation) {
+                            transform.rotation.copy(mesh.rotation);
+                        }
+
+                        // Immediately sync the visual mesh component instead of waiting for physics step
+                        const meshComp = entity.components.MeshComponent;
+                        if (meshComp && meshComp.mesh) {
+                            meshComp.mesh.position.copy(transform.position);
+                            meshComp.mesh.rotation.copy(transform.rotation);
+                            meshComp.mesh.scale.copy(mesh.scale);
+                        }
+                    }
+                }
+
+                // Update specific selected pos in store for UI reactivity
+                store.editorLevelData = { ...this.currentLevelData };
+            }
+        });
+
+        this.scene.add(this.transformControl);
+
         // Editor Viewport Interaction
         window.addEventListener('pointerdown', (e) => this._onEditorClick(e));
+
+        // Editor Hotkeys (W, E, R for Translate, Rotate, Scale)
+        window.addEventListener('keydown', (e) => {
+            if (!store.showLevelEditor) return;
+            switch (e.key.toLowerCase()) {
+                case 'w': this.transformControl.setMode('translate'); break;
+                case 'e': this.transformControl.setMode('rotate'); break;
+                case 'r': this.transformControl.setMode('scale'); break;
+                case 'u': // Also allow 'T' or 'U' if desired, but W/E/R is standard Unity/UE
+                    break;
+            }
+        });
     }
 
     toggleColliderVisuals(show) {
@@ -161,6 +282,7 @@ export class Game {
 
     _onEditorClick(event) {
         if (!store.showLevelEditor) return;
+        if (this.isGizmoDragging) return; // Prevent raycasting if currently using the transform gizmo
 
         // Ignore clicks on UI elements (which should prevent propagation, but just in case)
         if (event.target.closest('.editor-sidebar')) return;
@@ -169,7 +291,9 @@ export class Game {
         this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-        this.raycaster.setFromCamera(this.mouse, this.activeCamera);
+        // Ensure TransformControls is using the correct camera
+        this.transformControl.camera = this.editorCamera;
+        this.raycaster.setFromCamera(this.mouse, this.editorCamera);
 
         // 1. Check if clicking an existing gizmo
         const hitId = this.editorGizmos.raycast(this.raycaster);
@@ -177,6 +301,15 @@ export class Game {
         if (store.editorTool === 'select') {
             store.editorSelectedId = hitId;
             this.editorGizmos.setSelected(hitId);
+
+            if (hitId) {
+                const g = this.editorGizmos.gizmos.find(x => x.id === hitId);
+                if (g && g.mesh) {
+                    this.transformControl.attach(g.mesh);
+                }
+            } else {
+                this.transformControl.detach();
+            }
             return;
         }
 
@@ -212,6 +345,16 @@ export class Game {
             if (!this.currentLevelData.collectibles) this.currentLevelData.collectibles = [];
             newObj = { id, type: 'ammo', name: 'Handgun Ammo', amount: 15, pos: [x, y, z] };
             this.currentLevelData.collectibles.push(newObj);
+        } else if (type === 'light') {
+            if (!this.currentLevelData.lights) this.currentLevelData.lights = [];
+            newObj = { id, pos: [x, y + 2, z], color: 16768426, intensity: 5, distance: 10 }; // default warm white
+            this.currentLevelData.lights.push(newObj);
+
+            // Spawn physical pointlight immediately
+            const pLight = new THREE.PointLight(newObj.color, newObj.intensity, newObj.distance);
+            pLight.position.set(x, y + 2, z);
+            pLight.userData.id = id;
+            this.scene.add(pLight);
         }
 
         // Sync Vue store to force UI update
@@ -223,7 +366,11 @@ export class Game {
             this.editorGizmos.removeById('playerSpawn');
             this.editorGizmos.addGizmo('playerSpawn', 'playerSpawn', x, y + 1, z);
         } else {
-            this.editorGizmos.addGizmo(type, id, newObj.pos[0], newObj.pos[1] + (type === 'zombie' ? 0.5 : 0.3), newObj.pos[2]);
+            let yOffset = 0;
+            if (type === 'zombie') yOffset = 0.5;
+            if (type === 'collectible') yOffset = 0.3;
+            // lights and cameras stay at pos
+            this.editorGizmos.addGizmo(type, id, newObj.pos[0], newObj.pos[1] + yOffset, newObj.pos[2]);
         }
 
         // Auto-select the newly placed object
@@ -497,10 +644,94 @@ export class Game {
         }
 
         // Render
+        const renderCamera = store.showLevelEditor ? this.editorCamera : this.activeCamera;
+
+        if (store.showLevelEditor) {
+            if (this.orbitControls) {
+                if (!this.isGizmoDragging) this.orbitControls.enabled = true;
+                this.orbitControls.update();
+            }
+
+            // Sync gizmo spheres back to ECS entities if they move (e.g. zombies walking)
+            if (this.editorGizmos && !this.isGizmoDragging) {
+                this.editorGizmos.gizmos.forEach(g => {
+                    const id = g.id;
+                    if (g.type === 'camera') {
+                        const camObj = this.cameras && this.cameras[this.currentLevelIndex] && this.cameras[this.currentLevelIndex].find(c => c.camera.userData.id === id);
+                        if (camObj) {
+                            g.mesh.position.copy(camObj.camera.position);
+                            if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
+                                this.editorGizmos._ringMesh.position.copy(g.mesh.position);
+                            }
+                        }
+                    } else if (g.type === 'light') {
+                        const light = this.scene.children.find(c => c.isPointLight && c.userData.id === id);
+                        if (light) {
+                            g.mesh.position.copy(light.position);
+                            if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
+                                this.editorGizmos._ringMesh.position.copy(g.mesh.position);
+                            }
+                        }
+                    } else {
+                        let entity = this.world.entities.find(e => e.persistentId === id);
+                        if (!entity && id === 'playerSpawn') {
+                            entity = this.playerEntity;
+                        }
+
+                        if (entity && entity.components.Transform) {
+                            const tPos = entity.components.Transform.position;
+                            const yOffset = g.type === 'zombie' ? 0.5 : (g.type === 'collectible' ? 0.3 : 0);
+                            g.mesh.position.set(tPos.x, tPos.y + yOffset, tPos.z);
+
+                            if (this.editorGizmos.selectedId === id && this.editorGizmos._ringMesh) {
+                                this.editorGizmos._ringMesh.position.copy(g.mesh.position);
+                            }
+                        }
+                    }
+                });
+            }
+        } else {
+            if (this.orbitControls) this.orbitControls.enabled = false;
+        }
+
         if (this.isTransitioning) {
             this.renderer.render(this.transitionScene, this.transitionCamera);
-        } else if (this.activeCamera) {
-            this.renderer.render(this.scene, this.activeCamera);
+        } else if (renderCamera) {
+            if (this.transformControl) this.transformControl.camera = renderCamera;
+
+            // 1. Full screen primary render
+            this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+            this.renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
+            this.renderer.setScissorTest(false);
+            this.renderer.render(this.scene, renderCamera);
+
+            // 2. Camera Preview (PiP) in Editor Mode
+            if (store.showLevelEditor && store.editorSelectedId) {
+                const selCamObj = this.cameras[this.currentLevelIndex]?.find(c => c.camera.userData.id === store.editorSelectedId);
+                if (selCamObj) {
+                    const pipWidth = 320;
+                    const pipHeight = 180;
+                    const padding = 20;
+
+                    // Bottom-center
+                    const startX = (window.innerWidth / 2) - (pipWidth / 2);
+                    const startY = padding;
+
+                    this.renderer.setViewport(startX, startY, pipWidth, pipHeight);
+                    this.renderer.setScissor(startX, startY, pipWidth, pipHeight);
+                    this.renderer.setScissorTest(true);
+
+                    // Clear depth so the PiP renders on top
+                    this.renderer.clearDepth();
+
+                    // Render the scene from the selected camera's perspective
+                    this.renderer.render(this.scene, selCamObj.camera);
+
+                    // Reset renderer state for next frame
+                    this.renderer.setScissorTest(false);
+                    this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+                }
+            }
         }
 
         // Legacy Update for Player (UI/Input)
